@@ -7,6 +7,18 @@
 
 > **Portfolio-safe by design:** all datasets are synthetic and all infrastructure mutations are simulated. The project demonstrates orchestration, tool selection and governance without touching a real production environment.
 
+## Verified end-to-end proof
+
+AutonomousOps has been exercised through a real GitHub event path, not just a local function call:
+
+1. A synthetic `[INCIDENT]` issue triggered GitHub Actions.
+2. The agent classified the checkout outage as **P1**, grounded on `api-latency.md`, collected diagnostics and paused at the approval gate.
+3. An authorized `/approve` issue comment resumed the workflow.
+4. The allowlisted **scale worker** simulation executed successfully and GitHub Actions posted the final stakeholder/audit response.
+5. The demonstration issue was closed as completed.
+
+**Proof run:** [Issue #1 — Checkout API timeouts after deployment](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/issues/1)
+
 ## Why I built this
 
 Many AI portfolios stop at chatbots or dashboards. AutonomousOps demonstrates a harder enterprise pattern: an operational event starts the system, specialist agents build context, knowledge grounds the plan, deterministic policy controls risk, tools execute allowed steps, humans approve high-impact actions, stakeholders are updated and the complete run is auditable.
@@ -51,11 +63,11 @@ flowchart TD
 | Risk Agent | Deterministic approval policy |
 | Resolution Agent | Grounded allowlisted action selection |
 | Tool Executor | Diagnostics + safe remediation simulation |
-| Human-in-the-loop | Approval-gated workflow resume in Streamlit/API |
+| Human-in-the-loop | Streamlit/API approval + GitHub `/approve` / `/reject` resume path |
 | Communications Agent | Stakeholder-ready incident update |
 | AgentOps | Trace IDs, per-agent evidence and JSONL audit log |
-| Evaluation | Checked-in test set + pytest + Streamlit metrics |
-| CI | GitHub Actions compile/test/smoke workflow |
+| Evaluation | Checked-in test set + pytest + reproducible evaluation command |
+| CI | Compile, tests, evaluation, CLI, Streamlit, FastAPI and Docker smoke checks |
 | Containerization | Docker + docker-compose |
 | Copilot Studio mapping | Detailed enterprise implementation blueprint |
 
@@ -98,7 +110,7 @@ cp .env.example .env
 # add OPENAI_API_KEY to .env
 ```
 
-The deterministic fallback remains active if no key is present or the model call fails.
+The deterministic fallback remains active if no key is present or the model call fails. Severity, approval and tool permissions remain deterministic in both modes.
 
 ## Run the API
 
@@ -139,6 +151,8 @@ docker compose up --build
 - FastAPI: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 
+See [docs/deployment.md](docs/deployment.md) for the public deployment path.
+
 ## Autonomous GitHub demo
 
 This is the most recruiter-friendly proof that the project is **event driven rather than chat only**.
@@ -149,16 +163,19 @@ This is the most recruiter-friendly proof that the project is **event driven rat
 4. The issue title starts with `[INCIDENT]`, which triggers `.github/workflows/incident-agent-demo.yml`.
 5. GitHub Actions runs the complete orchestrator.
 6. The agent posts severity, runbook, hypotheses, tool trace, governance evidence and the stakeholder update back to the issue.
+7. If the risk gate pauses the workflow, an authorized repository owner/collaborator comments `/approve` to resume the safe simulation or `/reject` to stop it.
+8. The resumed workflow posts the final tool execution and stakeholder update back to the issue.
 
 No separate `incident` label is required.
 
 ## Evaluation
 
 ```bash
-pytest -q
+python -m pytest -q
+python scripts/evaluate.py
 ```
 
-Or open the **Evaluation** tab in Streamlit. Metrics are computed directly from `data/sample_incidents.csv`.
+Or open the **Evaluation** tab in Streamlit. Metrics are computed directly from the 8 checked-in synthetic cases in `data/sample_incidents.csv`.
 
 The repository deliberately does **not** hard-code impressive-looking portfolio metrics. Only measured results should be added to a CV or LinkedIn project description.
 
@@ -176,6 +193,7 @@ The repository deliberately does **not** hard-code impressive-looking portfolio 
 │   ├── orchestrator.py            # multi-agent workflow
 │   └── tools.py                   # governed tool layer
 ├── scripts/
+│   ├── evaluate.py                # reproducible evaluation command
 │   ├── simulate_incident.py
 │   └── github_issue_agent.py
 ├── knowledge/runbooks/            # grounded operating procedures
@@ -183,11 +201,13 @@ The repository deliberately does **not** hard-code impressive-looking portfolio 
 ├── docs/
 │   ├── architecture.md
 │   ├── copilot-studio-implementation.md
-│   └── demo-script.md
+│   ├── demo-script.md
+│   └── deployment.md
 ├── tests/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/incident.yml
 │   └── workflows/
+├── .streamlit/config.toml
 ├── Dockerfile
 ├── docker-compose.yml
 ├── SECURITY.md
