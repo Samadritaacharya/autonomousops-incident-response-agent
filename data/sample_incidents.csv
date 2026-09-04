@@ -1,0 +1,9 @@
+incident_id,title,description,service,environment,customer_impact,recent_change,expected_severity,expected_runbook,expected_approval
+INC-1001,Checkout API timeouts,Production checkout requests are timing out for multiple users after a deployment,checkout-api,production,Multiple customers cannot complete checkout,true,P1,api-latency.md,true
+INC-1002,Order queue backlog,Background workers are delayed and queue depth is increasing,order-processing,production,Orders are delayed,false,P2,order-processing.md,true
+INC-1003,Reporting refresh failed,Nightly analytics refresh failed once,analytics,staging,Internal dashboard data is stale,false,P4,generic-incident.md,false
+INC-1004,Database unavailable,Primary database is unavailable and all users are affected,customer-db,production,All users cannot access the service,true,P1,database.md,true
+INC-1005,Checkout latency degraded,API latency is degraded for multiple users,checkout-api,production,Some customers experience slow checkout,false,P2,api-latency.md,true
+INC-1006,Queue worker warning,Worker processing is slightly delayed,order-processing,staging,Internal test orders delayed,false,P3,order-processing.md,false
+INC-1007,Analytics scheduled job issue,One analytics job needs a retry,analytics,development,No customer impact,false,P4,generic-incident.md,false
+INC-1008,Customer database connection failures,Database connection failures affect multiple users,customer-db,production,Multiple users see errors,false,P2,database.md,true
