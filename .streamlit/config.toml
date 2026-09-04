@@ -4,6 +4,3 @@ runOnSave = false
 
 [browser]
 gatherUsageStats = false
-
-[client]
-showErrorDetails = "none"
