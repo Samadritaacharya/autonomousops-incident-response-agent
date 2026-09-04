@@ -22,6 +22,6 @@ jobs:
       - name: Compile
         run: python -m compileall src scripts app.py api.py
       - name: Unit and governance tests
-        run: pytest -q
+        run: python -m pytest -q
       - name: CLI smoke test
         run: python scripts/simulate_incident.py > /tmp/autonomousops-demo.json
