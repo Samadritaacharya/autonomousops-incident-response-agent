@@ -3,6 +3,8 @@ name: Autonomous incident agent
 on:
   issues:
     types: [opened, edited, labeled]
+  issue_comment:
+    types: [created]
   workflow_dispatch:
 
 permissions:
@@ -13,8 +15,11 @@ jobs:
   triage:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      startsWith(github.event.issue.title, '[INCIDENT]') ||
-      contains(github.event.issue.labels.*.name, 'incident')
+      (github.event_name == 'issues' &&
+        (startsWith(github.event.issue.title, '[INCIDENT]') || contains(github.event.issue.labels.*.name, 'incident'))) ||
+      (github.event_name == 'issue_comment' &&
+        startsWith(github.event.issue.title, '[INCIDENT]') &&
+        (startsWith(github.event.comment.body, '/approve') || startsWith(github.event.comment.body, '/reject')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,8 +28,8 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Process incident event
-        if: github.event_name == 'issues'
+      - name: Process incident event or human decision
+        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -32,4 +37,4 @@ jobs:
         run: python scripts/github_issue_agent.py
       - name: Run governance suite
         if: github.event_name == 'workflow_dispatch'
-        run: pytest -q
+        run: python -m pytest -q
