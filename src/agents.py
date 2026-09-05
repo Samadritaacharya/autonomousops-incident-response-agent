@@ -117,7 +117,9 @@ class RootCauseAgent:
             runbook_steps=steps,
         )
         if generated:
-            return generated
+            bounded = [str(item).strip() for item in generated if str(item).strip()][:3]
+            if bounded:
+                return bounded
 
         hypotheses: List[str] = []
         if incident.recent_change:
