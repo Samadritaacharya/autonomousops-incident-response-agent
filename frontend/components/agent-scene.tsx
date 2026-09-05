@@ -1,7 +1,7 @@
 'use client'
 
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 
 const agents = [
@@ -51,9 +51,10 @@ type SceneProps = {
   activeIndex?: number
   completed?: number
   severity?: string
+  reducedMotion?: boolean
 }
 
-function LiquidCore({ severity }: { severity?: string }) {
+function LiquidCore({ severity, reducedMotion = false }: { severity?: string; reducedMotion?: boolean }) {
   const mesh = useRef<THREE.Mesh>(null)
   const material = useMemo(
     () =>
@@ -70,7 +71,10 @@ function LiquidCore({ severity }: { severity?: string }) {
     [severity],
   )
 
+  useEffect(() => () => material.dispose(), [material])
+
   useFrame((state) => {
+    if (reducedMotion) return
     material.uniforms.uTime.value = state.clock.elapsedTime
     if (mesh.current) {
       mesh.current.rotation.y = state.clock.elapsedTime * 0.16
@@ -102,6 +106,11 @@ function Connections() {
     [],
   )
 
+  useEffect(() => () => {
+    geometry.dispose()
+    material.dispose()
+  }, [geometry, material])
+
   return <lineSegments geometry={geometry} material={material} />
 }
 
@@ -110,18 +119,20 @@ function Node({
   index,
   activeIndex = -1,
   completed = 0,
+  reducedMotion = false,
 }: {
   position: readonly [number, number, number]
   index: number
   activeIndex?: number
   completed?: number
+  reducedMotion?: boolean
 }) {
   const mesh = useRef<THREE.Mesh>(null)
   const isActive = index === activeIndex
   const isComplete = index < completed
 
   useFrame((state) => {
-    if (!mesh.current) return
+    if (!mesh.current || reducedMotion) return
     const target = isActive ? 1.36 : isComplete ? 1.12 : 1
     const pulse = isActive ? Math.sin(state.clock.elapsedTime * 7) * 0.08 : 0
     const value = THREE.MathUtils.lerp(mesh.current.scale.x, target + pulse, 0.12)
@@ -129,7 +140,7 @@ function Node({
   })
 
   return (
-    <mesh ref={mesh} position={position}>
+    <mesh ref={mesh} position={position} scale={isActive ? 1.25 : isComplete ? 1.1 : 1}>
       <sphereGeometry args={[0.16, 32, 32]} />
       <meshStandardMaterial
         color={isComplete || isActive ? '#dffcf2' : '#32433e'}
@@ -142,9 +153,10 @@ function Node({
   )
 }
 
-function Scene({ activeIndex = -1, completed = 0, severity }: SceneProps) {
+function Scene({ activeIndex = -1, completed = 0, severity, reducedMotion = false }: SceneProps) {
   const group = useRef<THREE.Group>(null)
   useFrame((state, delta) => {
+    if (reducedMotion) return
     if (group.current) group.current.rotation.z += delta * 0.015
     state.camera.position.x = Math.sin(state.clock.elapsedTime * 0.08) * 0.18
     state.camera.lookAt(0, 0, 0)
@@ -153,19 +165,53 @@ function Scene({ activeIndex = -1, completed = 0, severity }: SceneProps) {
   return (
     <group ref={group}>
       <Connections />
-      <LiquidCore severity={severity} />
+      <LiquidCore severity={severity} reducedMotion={reducedMotion} />
       {agents.map(([, position], index) => (
-        <Node key={index} position={position} index={index} activeIndex={activeIndex} completed={completed} />
+        <Node
+          key={index}
+          position={position}
+          index={index}
+          activeIndex={activeIndex}
+          completed={completed}
+          reducedMotion={reducedMotion}
+        />
       ))}
     </group>
   )
 }
 
+function supportsWebGL() {
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'))
+  } catch {
+    return false
+  }
+}
+
 export function AgentScene(props: SceneProps) {
+  const [webgl, setWebgl] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    setWebgl(supportsWebGL())
+  }, [])
+
+  if (webgl === false) {
+    return (
+      <div className="scene-fallback" role="img" aria-label="Agent orchestration graph">
+        <strong>AutonomousOps</strong>
+        <span>Triage · Runbook · Root Cause · Risk · Resolution · Tools · Communications</span>
+      </div>
+    )
+  }
+
+  if (webgl === null) return <div className="scene-fallback" aria-hidden="true" />
+
   return (
     <Canvas
       camera={{ position: [0, 0, 6.4], fov: 42 }}
       dpr={[1, 1.5]}
+      frameloop={props.reducedMotion ? 'demand' : 'always'}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
     >
       <ambientLight intensity={0.8} />
