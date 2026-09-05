@@ -8,6 +8,8 @@
 
 > **Portfolio-safe by design:** all incidents are synthetic and every infrastructure mutation is simulated. The project demonstrates enterprise orchestration and governance without touching a real production system.
 
+> **Control boundary at a glance:** severity, SLA, approval requirements, tool authorization, and remediation permission are deterministic. The optional LLM can enrich root-cause hypotheses only; it cannot approve or authorize a mutating action.
+
 ## Recruiter snapshot
 
 | Proof point | Verified result |
@@ -20,7 +22,13 @@
 | Command-center typecheck/tests/build/API smoke | **Passed in CI** |
 | Required paid runtime services | **0** |
 
-These are **CI-verified results on the checked-in synthetic evaluation set**, not claims about production reliability or real-world ML accuracy. The evaluation is intentionally reproducible and inspectable.
+**What the 100% means:** the current implementation matches all expected labels in the 24 checked-in, hand-authored synthetic regression scenarios. It is **not** a claim of 100% production accuracy or statistical generalization. The evaluation is intentionally reproducible, inspectable, and designed to catch regressions.
+
+## Command Center preview
+
+![AutonomousOps command center preview](docs/assets/command-center-preview.jpg)
+
+*Vercel-rendered preview of the interactive command center. The UI exposes incident simulation, governance state, orchestration evidence, evaluation results, and the 3D/motion layer without requiring a model key or paid API.*
 
 ## Interactive Command Center
 
@@ -62,6 +70,8 @@ AutonomousOps does **not** let a probabilistic model self-authorize operational 
 | Remediation | Simulated tools only | Safe portfolio demonstration |
 
 The optional LLM can enrich **hypotheses only**. It cannot change severity, bypass approval, grant tool permission, or authorize a mutation.
+
+For a concise interview-ready explanation of the metrics, trade-offs, limitations, and productionization path, see [`docs/interview-guide.md`](docs/interview-guide.md).
 
 ## Verified end-to-end event proof
 
@@ -271,6 +281,8 @@ No separate `incident` label is required.
 ├── knowledge/runbooks/
 ├── data/sample_incidents.csv       # 24-case labeled synthetic evaluation set
 ├── docs/
+│   ├── assets/command-center-preview.jpg
+│   └── interview-guide.md
 ├── tests/
 ├── .github/
 ├── Dockerfile
