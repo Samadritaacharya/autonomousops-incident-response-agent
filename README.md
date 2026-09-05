@@ -265,7 +265,7 @@ No separate `incident` label is required.
 │   ├── tests/                      # web governance and parity tests
 │   ├── DESIGN.md
 │   └── README.md
-├── app.py                          # Streamlit recruiter experience
+├── app.py                          # Streamlit demo experience
 ├── api.py                          # FastAPI endpoint
 ├── src/
 │   ├── agents.py                   # triage, vector retrieval, reasoning, risk, resolution
