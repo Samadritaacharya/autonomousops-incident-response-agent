@@ -5,6 +5,9 @@
 [![CI](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/ci.yml)
 [![Command Center CI](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/frontend-ci.yml)
 [![Autonomous incident agent](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/incident-agent-demo.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/incident-agent-demo.yml)
+[![Live App](https://img.shields.io/badge/Live_App-AutonomousOps-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://autonomousops-incident-response-age.vercel.app/)
+
+**🚀 Live app:** https://autonomousops-incident-response-age.vercel.app/
 
 > **Portfolio-safe by design:** all incidents are synthetic and every infrastructure mutation is simulated. The project demonstrates enterprise orchestration and governance without touching a real production system.
 
@@ -31,6 +34,8 @@
 *Vercel-rendered preview of the interactive command center. The UI exposes incident simulation, governance state, orchestration evidence, evaluation results, and the 3D/motion layer without requiring a model key or paid API.*
 
 ## Interactive Command Center
+
+[🚀 Open the live command center →](https://autonomousops-incident-response-age.vercel.app/)
 
 `frontend/` contains a **Next.js 16 / React 19** incident command center with:
 
