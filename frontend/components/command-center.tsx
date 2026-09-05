@@ -73,7 +73,7 @@ const presets: Array<{ label: string; incident: Incident }> = [
   },
 ]
 
-const emptyIncident: Incident = presets[0].incident
+const emptyIncident: Incident = { ...presets[0].incident }
 
 const agentLabels = [
   ['TriageAgent', 'Classify impact and SLA'],
@@ -97,14 +97,74 @@ type HistoryItem = {
   timestamp: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isIncident(value: unknown): value is Incident {
+  if (!isRecord(value)) return false
+  return (
+    typeof value.incident_id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.description === 'string' &&
+    typeof value.service === 'string' &&
+    typeof value.environment === 'string' &&
+    typeof value.customer_impact === 'string' &&
+    typeof value.recent_change === 'boolean'
+  )
+}
+
+function isAgentResult(value: unknown): value is AgentResult {
+  if (!isRecord(value)) return false
+  const severities = ['P1', 'P2', 'P3', 'P4']
+  const statuses = ['WAITING_FOR_APPROVAL', 'ACTION_EXECUTED', 'ACTION_BLOCKED']
+  return (
+    typeof value.trace_id === 'string' &&
+    severities.includes(String(value.severity)) &&
+    statuses.includes(String(value.status)) &&
+    typeof value.confidence === 'number' &&
+    typeof value.sla_minutes === 'number' &&
+    typeof value.runbook === 'string' &&
+    typeof value.requires_approval === 'boolean' &&
+    typeof value.auto_action === 'string' &&
+    typeof value.stakeholder_message === 'string' &&
+    typeof value.llm_mode === 'string' &&
+    Array.isArray(value.evidence) &&
+    Array.isArray(value.recommended_actions) &&
+    Array.isArray(value.root_cause_hypotheses) &&
+    Array.isArray(value.tool_executions) &&
+    Array.isArray(value.agent_trace)
+  )
+}
+
+function isHistoryItem(value: unknown): value is HistoryItem {
+  if (!isRecord(value)) return false
+  return typeof value.timestamp === 'string' && isIncident(value.incident) && isAgentResult(value.result)
+}
+
+function isEvaluationSummary(value: unknown): value is EvaluationSummary {
+  if (!isRecord(value)) return false
+  return (
+    typeof value.cases === 'number' &&
+    typeof value.severity_accuracy === 'number' &&
+    typeof value.runbook_accuracy === 'number' &&
+    typeof value.approval_gate_accuracy === 'number' &&
+    Array.isArray(value.rows)
+  )
+}
+
 function useHistory() {
   const [history, setHistory] = useState<HistoryItem[]>([])
+
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem('autonomousops-history')
-      if (stored) setHistory(JSON.parse(stored) as HistoryItem[])
+      if (!stored) return
+      const parsed = JSON.parse(stored) as unknown
+      if (!Array.isArray(parsed)) return
+      setHistory(parsed.filter(isHistoryItem).slice(0, 5))
     } catch {
-      // Local history is an enhancement only; the app never depends on browser storage.
+      // Local history is optional and never blocks incident processing.
     }
   }, [])
 
@@ -114,18 +174,20 @@ function useHistory() {
       try {
         window.localStorage.setItem('autonomousops-history', JSON.stringify(next))
       } catch {
-        // Ignore storage failures so incident processing remains functional.
+        // Ignore quota/private-mode storage failures.
       }
       return next
     })
   }
+
   return { history, push }
 }
 
 function Meter({ value }: { value: number }) {
+  const safe = Math.max(0, Math.min(1, value))
   return (
-    <div className="meter" aria-label={`${Math.round(value * 100)} percent`}>
-      <span style={{ width: `${Math.round(value * 100)}%` }} />
+    <div className="meter" aria-label={`${Math.round(safe * 100)} percent`}>
+      <span style={{ width: `${Math.round(safe * 100)}%` }} />
     </div>
   )
 }
@@ -169,25 +231,38 @@ function AgentPipeline({ result, activeIndex, busy }: { result: AgentResult | nu
 }
 
 export function CommandCenter() {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = Boolean(useReducedMotion())
   const [incident, setIncident] = useState<Incident>(emptyIncident)
   const [result, setResult] = useState<AgentResult | null>(null)
   const [evaluation, setEvaluation] = useState<EvaluationSummary | null>(null)
+  const [evaluationFailed, setEvaluationFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const simulatorRef = useRef<HTMLElement>(null)
+  const lastRunIncident = useRef<Incident | null>(null)
   const { history, push } = useHistory()
 
   useEffect(() => {
-    fetch('/api/evaluation', { cache: 'no-store' })
-      .then((response) => {
+    const controller = new AbortController()
+    fetch('/api/evaluation', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
         if (!response.ok) throw new Error('Evaluation endpoint failed')
-        return response.json() as Promise<EvaluationSummary>
+        const value = await response.json() as unknown
+        if (!isEvaluationSummary(value)) throw new Error('Evaluation response was invalid')
+        return value
       })
-      .then(setEvaluation)
-      .catch(() => setEvaluation(null))
+      .then((value) => {
+        setEvaluation(value)
+        setEvaluationFailed(false)
+      })
+      .catch((reason) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return
+        setEvaluation(null)
+        setEvaluationFailed(true)
+      })
+    return () => controller.abort()
   }, [])
 
   const completedCount = busy ? Math.max(activeIndex, 0) : result ? agentLabels.length : 0
@@ -199,13 +274,32 @@ export function CommandCenter() {
     return 'success'
   }, [result])
 
+  function invalidateResult() {
+    if (busy) return
+    setResult(null)
+    lastRunIncident.current = null
+    setError('')
+    setCopied(false)
+  }
+
   async function runIncident(decision?: 'approve' | 'reject') {
+    if (busy) return
+    if (decision && (result?.status !== 'WAITING_FOR_APPROVAL' || !lastRunIncident.current)) {
+      setError('This approval is no longer attached to the current incident. Run triage again.')
+      return
+    }
+
+    const submittedIncident = decision && lastRunIncident.current
+      ? { ...lastRunIncident.current }
+      : { ...incident }
+    const original = result
+
     setBusy(true)
     setError('')
     setCopied(false)
-    const original = result
-    let ticker: ReturnType<typeof setInterval> | undefined
+    if (!decision) setResult(null)
 
+    let ticker: ReturnType<typeof setInterval> | undefined
     if (!reduceMotion) {
       setActiveIndex(0)
       ticker = setInterval(() => {
@@ -219,17 +313,30 @@ export function CommandCenter() {
       const response = await fetch('/api/incidents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...incident, decision }),
+        body: JSON.stringify({ incident: submittedIncident, ...(decision ? { decision } : {}) }),
       })
-      const payload = (await response.json()) as AgentResult | { error: string }
-      if (!response.ok || 'error' in payload) {
-        throw new Error('error' in payload ? payload.error : 'Incident processing failed')
+      const responseText = await response.text()
+      let payload: unknown
+      try {
+        payload = JSON.parse(responseText)
+      } catch {
+        throw new Error('Incident service returned an invalid response.')
       }
+
+      if (!response.ok) {
+        const message = isRecord(payload) && typeof payload.error === 'string'
+          ? payload.error
+          : 'Incident processing failed'
+        throw new Error(message)
+      }
+      if (!isAgentResult(payload)) throw new Error('Incident service returned an invalid result contract.')
+
       if (!reduceMotion) await new Promise((resolve) => setTimeout(resolve, 850))
       setResult(payload)
-      push({ incident, result: payload, timestamp: new Date().toISOString() })
+      lastRunIncident.current = submittedIncident
+      push({ incident: submittedIncident, result: payload, timestamp: new Date().toISOString() })
     } catch (reason) {
-      setResult(original)
+      if (decision) setResult(original)
       setError(reason instanceof Error ? reason.message : 'Unable to process incident')
     } finally {
       if (ticker) clearInterval(ticker)
@@ -244,24 +351,47 @@ export function CommandCenter() {
   }
 
   function choosePreset(preset: (typeof presets)[number]) {
+    if (busy) return
     setIncident({ ...preset.incident, incident_id: `DEMO-${Date.now().toString().slice(-6)}` })
-    setResult(null)
-    setError('')
+    invalidateResult()
   }
 
   async function copyUpdate() {
     if (!result) return
     try {
-      await navigator.clipboard.writeText(result.stakeholder_message)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(result.stakeholder_message)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = result.stakeholder_message
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        const copiedFallback = document.execCommand('copy')
+        textarea.remove()
+        if (!copiedFallback) throw new Error('Clipboard unavailable')
+      }
       setCopied(true)
-      setTimeout(() => setCopied(false), 1600)
+      window.setTimeout(() => setCopied(false), 1600)
     } catch {
       setCopied(false)
+      setError('Copy failed. Select the stakeholder update manually.')
     }
   }
 
   function scrollToSimulator() {
     simulatorRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' })
+  }
+
+  function restoreHistory(item: HistoryItem) {
+    if (busy) return
+    setIncident({ ...item.incident })
+    setResult(item.result)
+    lastRunIncident.current = { ...item.incident }
+    setError('')
+    setCopied(false)
+    scrollToSimulator()
   }
 
   return (
@@ -288,7 +418,7 @@ export function CommandCenter() {
       </header>
 
       <section className="hero" id="top">
-        <ShaderGradientBackdrop />
+        <ShaderGradientBackdrop reducedMotion={reduceMotion} />
         <div className="hero-grid" aria-hidden="true" />
         <motion.div
           className="hero-copy"
@@ -323,9 +453,10 @@ export function CommandCenter() {
           </div>
           <div className="hero-scene">
             <AgentScene
-              activeIndex={busy ? activeIndex : result ? agentLabels.length - 1 : 2}
-              completed={busy ? completedCount : result ? agentLabels.length : 2}
+              activeIndex={busy ? activeIndex : -1}
+              completed={busy ? completedCount : result ? agentLabels.length : 0}
               severity={result?.severity}
+              reducedMotion={reduceMotion}
             />
           </div>
           <div className="console-footer">
@@ -400,67 +531,72 @@ export function CommandCenter() {
         </div>
 
         <div className="simulator-layout">
-          <form className="incident-form glass-panel" onSubmit={submit}>
-            <div className="preset-row" aria-label="Incident presets">
-              {presets.map((preset) => (
-                <button type="button" key={preset.label} onClick={() => choosePreset(preset)}>{preset.label}</button>
-              ))}
-            </div>
-            <label>
-              <span>Incident title</span>
-              <input
-                value={incident.title}
-                onChange={(event) => setIncident({ ...incident, title: event.target.value })}
-                required
-              />
-            </label>
-            <div className="form-row">
+          <form className="incident-form glass-panel" onSubmit={submit} onChangeCapture={invalidateResult} aria-busy={busy}>
+            <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'contents' }}>
+              <div className="preset-row" aria-label="Incident presets">
+                {presets.map((preset) => (
+                  <button type="button" key={preset.label} onClick={() => choosePreset(preset)}>{preset.label}</button>
+                ))}
+              </div>
               <label>
-                <span>Service</span>
-                <select value={incident.service} onChange={(event) => setIncident({ ...incident, service: event.target.value })}>
-                  <option value="checkout-api">checkout-api</option>
-                  <option value="order-processing">order-processing</option>
-                  <option value="customer-db">customer-db</option>
-                  <option value="analytics">analytics</option>
-                  <option value="unknown-service">unknown-service</option>
-                </select>
+                <span>Incident title</span>
+                <input
+                  value={incident.title}
+                  maxLength={240}
+                  onChange={(event) => setIncident({ ...incident, title: event.target.value })}
+                  required
+                />
+              </label>
+              <div className="form-row">
+                <label>
+                  <span>Service</span>
+                  <select value={incident.service} onChange={(event) => setIncident({ ...incident, service: event.target.value })}>
+                    <option value="checkout-api">checkout-api</option>
+                    <option value="order-processing">order-processing</option>
+                    <option value="customer-db">customer-db</option>
+                    <option value="analytics">analytics</option>
+                    <option value="unknown-service">unknown-service</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Environment</span>
+                  <select value={incident.environment} onChange={(event) => setIncident({ ...incident, environment: event.target.value })}>
+                    <option value="production">production</option>
+                    <option value="staging">staging</option>
+                    <option value="development">development</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                <span>What happened</span>
+                <textarea
+                  rows={4}
+                  value={incident.description}
+                  maxLength={6000}
+                  onChange={(event) => setIncident({ ...incident, description: event.target.value })}
+                  required
+                />
               </label>
               <label>
-                <span>Environment</span>
-                <select value={incident.environment} onChange={(event) => setIncident({ ...incident, environment: event.target.value })}>
-                  <option value="production">production</option>
-                  <option value="staging">staging</option>
-                  <option value="development">development</option>
-                </select>
+                <span>Customer impact</span>
+                <textarea
+                  rows={3}
+                  value={incident.customer_impact}
+                  maxLength={2000}
+                  onChange={(event) => setIncident({ ...incident, customer_impact: event.target.value })}
+                  required
+                />
               </label>
-            </div>
-            <label>
-              <span>What happened</span>
-              <textarea
-                rows={4}
-                value={incident.description}
-                onChange={(event) => setIncident({ ...incident, description: event.target.value })}
-                required
-              />
-            </label>
-            <label>
-              <span>Customer impact</span>
-              <textarea
-                rows={3}
-                value={incident.customer_impact}
-                onChange={(event) => setIncident({ ...incident, customer_impact: event.target.value })}
-                required
-              />
-            </label>
-            <label className="toggle-line">
-              <input
-                type="checkbox"
-                checked={incident.recent_change}
-                onChange={(event) => setIncident({ ...incident, recent_change: event.target.checked })}
-              />
-              <span className="toggle-track"><i /></span>
-              <span>Recent change or deployment detected</span>
-            </label>
+              <label className="toggle-line">
+                <input
+                  type="checkbox"
+                  checked={incident.recent_change}
+                  onChange={(event) => setIncident({ ...incident, recent_change: event.target.checked })}
+                />
+                <span className="toggle-track"><i /></span>
+                <span>Recent change or deployment detected</span>
+              </label>
+            </fieldset>
             <button className="button primary full" type="submit" disabled={busy}>
               {busy ? 'Orchestrating incident…' : 'Start autonomous triage'}
               {!busy && <ArrowIcon />}
@@ -472,13 +608,18 @@ export function CommandCenter() {
             <div className="run-panel-head">
               <div>
                 <p className="kicker">ORCHESTRATION TRACE</p>
-                <h3>{result ? statusCopy[result.status] : 'Ready for an incident'}</h3>
+                <h3>{result ? statusCopy[result.status] : busy ? 'Agents are working' : 'Ready for an incident'}</h3>
               </div>
               <div className="trace-id">{result?.trace_id ?? 'TRC-PENDING'}</div>
             </div>
 
             <div className="run-scene">
-              <AgentScene activeIndex={activeIndex} completed={completedCount} severity={result?.severity} />
+              <AgentScene
+                activeIndex={activeIndex}
+                completed={completedCount}
+                severity={result?.severity}
+                reducedMotion={reduceMotion}
+              />
               {result && (
                 <div className={`severity-badge ${result.severity.toLowerCase()}`}>
                   <strong>{result.severity}</strong><span>{result.sla_minutes} min SLA</span>
@@ -504,7 +645,7 @@ export function CommandCenter() {
                   </div>
                   <div className="hypothesis-box">
                     <span>Root-cause hypotheses</span>
-                    <ul>{result.root_cause_hypotheses.map((item) => <li key={item}>{item}</li>)}</ul>
+                    <ul>{result.root_cause_hypotheses.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
                   </div>
                   <div className="tool-trace">
                     {result.tool_executions.map((tool, index) => (
@@ -517,7 +658,7 @@ export function CommandCenter() {
                   </div>
                   {result.status === 'WAITING_FOR_APPROVAL' && (
                     <div className="approval-box">
-                      <div><span>Approval ID</span><code>{result.approval_id}</code></div>
+                      <div><span>Approval ID</span><code>{result.approval_id ?? 'PENDING'}</code></div>
                       <p>The agent stopped before the proposed write-capable action. Choose the operator decision.</p>
                       <div className="approval-actions">
                         <button className="button primary" onClick={() => void runIncident('approve')} disabled={busy}>Approve safe simulation</button>
@@ -551,7 +692,7 @@ export function CommandCenter() {
           </div>
         </div>
         <div className="architecture-visual glass-panel">
-          <AgentScene activeIndex={3} completed={3} severity="P2" />
+          <AgentScene activeIndex={3} completed={3} severity="P2" reducedMotion={reduceMotion} />
           <div className="architecture-ring-labels" aria-hidden="true">
             <span>Triage</span><span>Runbook</span><span>Root Cause</span><span>Risk</span><span>Resolution</span><span>Tools</span><span>Comms</span>
           </div>
@@ -578,7 +719,13 @@ export function CommandCenter() {
                 <Meter value={typeof value === 'number' ? value : 0} />
               </div>
             ))}
-            <p>{evaluation ? `${evaluation.cases} synthetic incidents evaluated on every CI run.` : 'Loading evaluation from the server route…'}</p>
+            <p>
+              {evaluation
+                ? `${evaluation.cases} synthetic incidents evaluated on every CI run.`
+                : evaluationFailed
+                  ? 'Evaluation endpoint is temporarily unavailable; core incident processing remains functional.'
+                  : 'Loading evaluation from the server route…'}
+            </p>
           </div>
           <div className="evaluation-table-wrap glass-panel">
             <table>
@@ -591,7 +738,7 @@ export function CommandCenter() {
                     <td>{row.runbook.replace('.md', '')}</td>
                     <td>{row.approval ? 'approval' : 'auto'}</td>
                   </tr>
-                )) ?? <tr><td colSpan={4}>Loading evaluation…</td></tr>}
+                )) ?? <tr><td colSpan={4}>{evaluationFailed ? 'Evaluation unavailable' : 'Loading evaluation…'}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -606,7 +753,7 @@ export function CommandCenter() {
               <button
                 key={`${item.result.trace_id}-${item.timestamp}`}
                 className="history-card glass-panel"
-                onClick={() => { setIncident(item.incident); setResult(item.result); scrollToSimulator() }}
+                onClick={() => restoreHistory(item)}
               >
                 <span>{item.result.severity} · {item.result.status.replaceAll('_', ' ')}</span>
                 <strong>{item.incident.title}</strong>
