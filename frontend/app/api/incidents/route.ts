@@ -1,42 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processIncident } from '@/lib/agent-engine'
-import type { Incident } from '@/lib/contracts'
+import { MAX_INCIDENT_REQUEST_BYTES, parseIncidentRequest } from '@/lib/input-validation'
 
 export const runtime = 'nodejs'
 
-function isIncident(value: unknown): value is Incident {
-  if (!value || typeof value !== 'object') return false
-  const item = value as Record<string, unknown>
-  const required = ['incident_id', 'title', 'description', 'service', 'environment', 'customer_impact']
-  return required.every((key) => typeof item[key] === 'string' && String(item[key]).trim().length > 0)
-    && typeof item.recent_change === 'boolean'
-}
-
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>
+  const declaredLength = Number(request.headers.get('content-length') ?? 0)
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_INCIDENT_REQUEST_BYTES) {
+    return NextResponse.json({ error: 'Request body is too large.' }, { status: 413 })
+  }
+
+  let raw = ''
   try {
-    body = await request.json()
+    raw = await request.text()
+  } catch {
+    return NextResponse.json({ error: 'Unable to read request body.' }, { status: 400 })
+  }
+
+  if (Buffer.byteLength(raw, 'utf8') > MAX_INCIDENT_REQUEST_BYTES) {
+    return NextResponse.json({ error: 'Request body is too large.' }, { status: 413 })
+  }
+
+  let body: unknown
+  try {
+    body = JSON.parse(raw)
   } catch {
     return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 })
   }
 
-  const candidate = (body.incident ?? body) as unknown
-  if (!isIncident(candidate)) {
-    return NextResponse.json(
-      { error: 'incident_id, title, description, service, environment, customer_impact and recent_change are required.' },
-      { status: 422 },
-    )
+  const parsed = parseIncidentRequest(body, request.nextUrl.searchParams.get('approved') === 'true')
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status })
   }
 
-  const approvedQuery = request.nextUrl.searchParams.get('approved') === 'true'
-  const decision = typeof body.decision === 'string' ? body.decision.toLowerCase() : ''
-  const approved = approvedQuery || body.approved === true || decision === 'approve'
-  const rejected = decision === 'reject'
-  const result = processIncident(candidate, approved, rejected)
-
+  const result = processIncident(parsed.incident, parsed.approved, parsed.rejected)
   return NextResponse.json(result, {
     headers: {
       'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
       'X-AutonomousOps-Engine': 'deterministic-fallback',
     },
   })
