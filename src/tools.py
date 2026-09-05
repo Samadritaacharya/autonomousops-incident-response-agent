@@ -27,10 +27,11 @@ class ToolRegistry:
 
     def execute(self, action: str, incident: Incident, *, approved: bool) -> ToolExecution:
         normalized = action.lower().strip()
-        read_match = next((x for x in self.READ_ONLY if x in normalized), None)
         safe_match = next((x for x in self.SAFE_MUTATIONS if x in normalized), None)
-        if read_match:
-            return ToolExecution(read_match, "SUCCEEDED", "Read-only diagnostic tool executed.")
+        read_match = next((x for x in self.READ_ONLY if x in normalized), None)
+
+        # Mutation intent takes precedence over read-only wording so a combined action
+        # cannot accidentally be treated as diagnostics and bypass the production gate.
         if safe_match:
             if approved or incident.environment.lower() != "production":
                 return ToolExecution(
@@ -43,6 +44,8 @@ class ToolRegistry:
                 "BLOCKED",
                 "Production mutation blocked because explicit approval was not provided.",
             )
+        if read_match:
+            return ToolExecution(read_match, "SUCCEEDED", "Read-only diagnostic tool executed.")
         return ToolExecution(
             normalized or "unknown action",
             "BLOCKED",
