@@ -65,6 +65,23 @@ test('recent production changes require approval even when severity is only P3',
   assert.match(result.evidence.at(-1) ?? '', /recent production change/i)
 })
 
+test('negated incident signals do not inflate severity', () => {
+  const incident: Incident = {
+    incident_id: 'EDGE-NEGATION',
+    title: 'Post-change validation',
+    description: 'Monitoring shows no outage and no errors after the configuration update.',
+    service: 'analytics',
+    environment: 'production',
+    customer_impact: 'No customer impact',
+    recent_change: true,
+  }
+  const result = processIncident(incident)
+  assert.equal(result.severity, 'P3')
+  assert.equal(result.requires_approval, true)
+  assert.equal(result.evidence.some((item) => item.includes("High-impact signal: 'outage'")), false)
+  assert.equal(result.evidence.some((item) => item.includes("Degradation signal: 'errors'")), false)
+})
+
 test('unknown services fall back to generic grounding when text has no service hints', () => {
   const incident: Incident = {
     incident_id: 'EDGE-GENERIC',
@@ -82,7 +99,7 @@ test('unknown services fall back to generic grounding when text has no service h
   assert.equal(result.tool_executions.at(-1)?.tool, 'collect diagnostics')
 })
 
-test('unknown services can still retrieve a matching runbook from incident text', () => {
+test('unknown services can retrieve a matching runbook from vector-space similarity', () => {
   const incident: Incident = {
     incident_id: 'EDGE-QUEUE',
     title: 'Queue backlog',
@@ -122,7 +139,7 @@ test('trace and approval identifiers have stable formats and fresh trace IDs', (
 
 test('evaluation remains reproducible at the checked-in baseline', () => {
   const summary = evaluateEngine()
-  assert.equal(summary.cases, 8)
+  assert.equal(summary.cases, 24)
   assert.equal(summary.severity_accuracy, 1)
   assert.equal(summary.runbook_accuracy, 1)
   assert.equal(summary.approval_gate_accuracy, 1)

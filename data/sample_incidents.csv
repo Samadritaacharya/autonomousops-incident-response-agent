@@ -1,9 +1,25 @@
 incident_id,title,description,service,environment,customer_impact,recent_change,expected_severity,expected_runbook,expected_approval
-INC-1001,Checkout API timeouts,Production checkout requests are timing out for multiple users after a deployment,checkout-api,production,Multiple customers cannot complete checkout,true,P1,api-latency.md,true
-INC-1002,Order queue backlog,Background workers are delayed and queue depth is increasing,order-processing,production,Orders are delayed,false,P2,order-processing.md,true
-INC-1003,Reporting refresh failed,Nightly analytics refresh failed once,analytics,staging,Internal dashboard data is stale,false,P4,generic-incident.md,false
-INC-1004,Database unavailable,Primary database is unavailable and all users are affected,customer-db,production,All users cannot access the service,true,P1,database.md,true
-INC-1005,Checkout latency degraded,API latency is degraded for multiple users,checkout-api,production,Some customers experience slow checkout,false,P2,api-latency.md,true
-INC-1006,Queue worker warning,Worker processing is slightly delayed,order-processing,staging,Internal test orders delayed,false,P3,order-processing.md,false
-INC-1007,Analytics scheduled job issue,One analytics job needs a retry,analytics,development,No customer impact,false,P4,generic-incident.md,false
-INC-1008,Customer database connection failures,Database connection failures affect multiple users,customer-db,production,Multiple users see errors,false,P2,database.md,true
+INC-1001,Checkout API timeouts,Production checkout requests are timing out for multiple users after a deployment,checkout-api,production,Multiple customers cannot complete checkout,True,P1,api-latency.md,True
+INC-1002,Order queue backlog,Background workers are delayed and queue depth is increasing,order-processing,production,Orders are delayed,False,P2,order-processing.md,True
+INC-1003,Reporting refresh failed,Nightly analytics refresh failed once,analytics,staging,Internal dashboard data is stale,False,P4,generic-incident.md,False
+INC-1004,Database unavailable,Primary database is unavailable and all users are affected,customer-db,production,All users cannot access the service,True,P1,database.md,True
+INC-1005,Checkout latency degraded,API latency is degraded for multiple users,checkout-api,production,Some customers experience slow checkout,False,P2,api-latency.md,True
+INC-1006,Queue worker warning,Worker processing is slightly delayed,order-processing,staging,Internal test orders delayed,False,P3,order-processing.md,False
+INC-1007,Analytics scheduled job issue,One analytics job needs a retry,analytics,development,No customer impact,False,P4,generic-incident.md,False
+INC-1008,Customer database connection failures,Database connection failures affect multiple users,customer-db,production,Multiple users see errors,False,P2,database.md,True
+INC-1009,Inventory API timeout,Inventory API latency and timeout increased after an upstream slowdown,inventory-api,production,Multiple users see slow product availability,False,P2,api-latency.md,True
+INC-1010,Shipping queue backlog,Shipping worker queue backlog is increasing and order dispatch is delayed,shipping-worker,production,Some orders are delayed,False,P3,order-processing.md,False
+INC-1011,Billing database saturation,Database connection saturation and slow queries are affecting billing reads,billing-store,production,Multiple users see errors,False,P3,database.md,False
+INC-1012,Internal feature-flag warning,A non-customer internal alert has no matching service-specific symptom,feature-flags,development,No customer impact,False,P4,generic-incident.md,False
+INC-1013,Recent production config change,Configuration was updated successfully and monitoring shows no outage,analytics,production,No customer impact,True,P3,generic-incident.md,True
+INC-1014,Staging API latency,API latency is degraded during staging load tests,checkout-api,staging,Internal test users see slow responses,False,P3,api-latency.md,False
+INC-1015,Checkout outage,Checkout service outage means all users cannot checkout,checkout-api,production,All users cannot complete checkout,False,P1,api-latency.md,True
+INC-1016,Order processing failure,Failed jobs and queue depth are rising after a deployment,order-processing,production,Multiple users have delayed orders,True,P2,order-processing.md,True
+INC-1017,Database lock warning,Slow queries and lock contention observed on customer database,customer-db,staging,Internal testers see intermittent errors,False,P4,database.md,False
+INC-1018,Analytics dashboard stale,One reporting refresh finished late,analytics,production,Internal dashboard is stale,False,P4,generic-incident.md,False
+INC-1019,Payments failure,Payment failure is affecting all users during checkout,checkout-api,production,All users cannot complete checkout,True,P1,api-latency.md,True
+INC-1020,Queue depth spike,Queue depth increased but customers are not yet affected,order-processing,development,No customer impact,False,P4,order-processing.md,False
+INC-1021,Unknown database outage,Database is unavailable and connection failures are reported,payments-store,production,All users see errors,False,P1,database.md,True
+INC-1022,Unknown API degradation,Public API latency is degraded for multiple users,catalog-service,production,Multiple users see slow responses,False,P2,api-latency.md,True
+INC-1023,Unknown worker delay,Worker processing is delayed and queue backlog is growing,fulfillment,staging,Internal test orders delayed,False,P3,order-processing.md,False
+INC-1024,Low-risk maintenance alert,A scheduled internal maintenance check reported one warning,ops-maintenance,staging,No customer impact,False,P4,generic-incident.md,False

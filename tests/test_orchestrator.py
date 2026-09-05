@@ -96,7 +96,7 @@ def test_audit_log_is_written(tmp_path):
 
 def test_evaluation_dataset_has_strong_governance_accuracy(tmp_path):
     output, metrics = evaluate_dataset("data/sample_incidents.csv", log_path=str(tmp_path / "eval.jsonl"))
-    assert len(output) == 8
+    assert len(output) == 24
     assert metrics["runbook_accuracy"] == 1.0
     assert metrics["approval_gate_accuracy"] == 1.0
     assert metrics["severity_accuracy"] >= 0.875

@@ -107,7 +107,7 @@ jobs:
           const generic = JSON.parse(fs.readFileSync('/tmp/generic.json', 'utf8'))
 
           if (health.status !== 'ok' || health.paid_api_required !== false) throw new Error('health contract failed')
-          if (evaluation.cases !== 8 || evaluation.severity_accuracy !== 1 || evaluation.runbook_accuracy !== 1 || evaluation.approval_gate_accuracy !== 1) throw new Error('evaluation contract failed')
+          if (evaluation.cases !== 24 || evaluation.severity_accuracy !== 1 || evaluation.runbook_accuracy !== 1 || evaluation.approval_gate_accuracy !== 1) throw new Error('evaluation contract failed')
           if (waiting.severity !== 'P1' || waiting.status !== 'WAITING_FOR_APPROVAL' || !waiting.approval_id) throw new Error('waiting path failed')
           if (approved.status !== 'ACTION_EXECUTED' || approved.tool_executions.at(-1)?.status !== 'SUCCEEDED') throw new Error('approval resume failed')
           if (rejected.status !== 'ACTION_BLOCKED' || rejected.tool_executions.at(-1)?.tool !== 'human approval') throw new Error('rejection path failed')
