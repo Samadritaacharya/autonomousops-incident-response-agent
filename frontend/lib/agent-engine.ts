@@ -17,9 +17,13 @@ export const SEVERITY_SLA: Record<Severity, number> = {
   P4: 480,
 }
 
-const runbooks: Record<string, { name: string; steps: string[] }> = {
+type Runbook = { name: string; document: string; steps: string[] }
+
+const runbooks: Record<string, Runbook> = {
   'checkout-api': {
     name: 'api-latency.md',
+    document:
+      'API latency timeout runbook for API timeouts, latency spikes, exhausted workers, dependency degradation, error rate and resource saturation.',
     steps: [
       'Collect diagnostics and recent logs',
       'Check API p95 latency, error rate, CPU and memory saturation',
@@ -31,6 +35,8 @@ const runbooks: Record<string, { name: string; steps: string[] }> = {
   },
   'order-processing': {
     name: 'order-processing.md',
+    document:
+      'Order processing queue backlog runbook for failed orders, asynchronous processing delays, queue depth, backlog and worker failures.',
     steps: [
       'Collect diagnostics and recent logs',
       'Inspect queue depth and oldest-message age',
@@ -42,6 +48,8 @@ const runbooks: Record<string, { name: string; steps: string[] }> = {
   },
   'customer-db': {
     name: 'database.md',
+    document:
+      'Database incident runbook for connection saturation, slow queries, read write failures, locks, active sessions and database unavailability.',
     steps: [
       'Collect diagnostics and recent logs',
       'Check connection pool saturation and active sessions',
@@ -53,6 +61,8 @@ const runbooks: Record<string, { name: string; steps: string[] }> = {
   },
   analytics: {
     name: 'generic-incident.md',
+    document:
+      'Generic incident runbook when no service-specific runbook matches. Validate service health, dependencies, customer impact, scope and ownership.',
     steps: [
       'Collect diagnostics and recent logs',
       'Validate service health and dependencies',
@@ -95,19 +105,63 @@ function code(prefix: string, size = 10) {
   return `${prefix}-${randomUUID().replaceAll('-', '').slice(0, size).toUpperCase()}`
 }
 
+function signalPresent(text: string, term: string) {
+  if (!text.includes(term)) return false
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
+  const negated = new RegExp(`\\b(?:no|not|without|never)\\s+(?:\\w+\\s+){0,2}${escaped}\\b`, 'i')
+  return !negated.test(text)
+}
+
+function tokenize(text: string) {
+  return text.toLowerCase().match(/[a-z0-9]+/g) ?? []
+}
+
+function cosineRetrievalScore(queryText: string, documentText: string, corpus: string[]) {
+  const documentTokens = corpus.map((text) => tokenize(text))
+  const documentFrequency = new Map<string, number>()
+  for (const tokens of documentTokens) {
+    for (const term of new Set(tokens)) {
+      documentFrequency.set(term, (documentFrequency.get(term) ?? 0) + 1)
+    }
+  }
+
+  const count = corpus.length
+  const unknownIdf = Math.log((1 + count) / 1) + 1
+  const vector = (tokens: string[]) => {
+    const counts = new Map<string, number>()
+    for (const term of tokens) counts.set(term, (counts.get(term) ?? 0) + 1)
+    const output = new Map<string, number>()
+    for (const [term, occurrences] of counts) {
+      const idf = Math.log((1 + count) / (1 + (documentFrequency.get(term) ?? 0))) + 1
+      output.set(term, (1 + Math.log(occurrences)) * (documentFrequency.has(term) ? idf : unknownIdf))
+    }
+    return output
+  }
+
+  const left = vector(tokenize(queryText))
+  const right = vector(tokenize(documentText))
+  let dot = 0
+  let leftNorm = 0
+  let rightNorm = 0
+  for (const weight of left.values()) leftNorm += weight * weight
+  for (const weight of right.values()) rightNorm += weight * weight
+  for (const [term, weight] of left) dot += weight * (right.get(term) ?? 0)
+  return leftNorm && rightNorm ? dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm)) : 0
+}
+
 function classify(incident: Incident): { severity: Severity; confidence: number; evidence: string[] } {
   const text = `${incident.title} ${incident.description} ${incident.customer_impact}`.toLowerCase()
   const evidence: string[] = []
   let score = 0
 
   for (const term of highSignals) {
-    if (text.includes(term)) {
+    if (signalPresent(text, term)) {
       score += 3
       evidence.push(`High-impact signal: '${term}'`)
     }
   }
   for (const term of mediumSignals) {
-    if (text.includes(term)) {
+    if (signalPresent(text, term)) {
       score += 1
       evidence.push(`Degradation signal: '${term}'`)
     }
@@ -129,19 +183,25 @@ function classify(incident: Incident): { severity: Severity; confidence: number;
 }
 
 function selectRunbook(incident: Incident) {
-  const byService = runbooks[incident.service]
-  if (byService) return { ...byService, score: 0.72 }
-  const text = `${incident.service} ${incident.title} ${incident.description}`.toLowerCase()
-  if (text.includes('database') || text.includes('db') || text.includes('connection')) {
-    return { ...runbooks['customer-db'], score: 0.58 }
+  const unique = Array.from(new Map(Object.values(runbooks).map((item) => [item.name, item])).values())
+  const corpus = unique.map((item) => `${item.document} ${item.steps.join(' ')}`)
+  const query = `${incident.service} ${incident.title} ${incident.description}`
+  const preferred = runbooks[incident.service]?.name
+
+  let best = genericRunbook
+  let bestScore = -1
+  for (const item of unique) {
+    const document = `${item.document} ${item.steps.join(' ')}`
+    let score = cosineRetrievalScore(query, document, corpus)
+    if (item.name === preferred) score += 0.35
+    if (score > bestScore) {
+      best = item
+      bestScore = score
+    }
   }
-  if (text.includes('queue') || text.includes('order') || text.includes('worker')) {
-    return { ...runbooks['order-processing'], score: 0.56 }
-  }
-  if (text.includes('api') || text.includes('latency') || text.includes('timeout')) {
-    return { ...runbooks['checkout-api'], score: 0.55 }
-  }
-  return { ...genericRunbook, score: 0.35 }
+
+  if (!preferred && bestScore < 0.08) best = genericRunbook
+  return { ...best, score: Math.max(bestScore, 0) }
 }
 
 function hypotheses(incident: Incident): string[] {
@@ -285,7 +345,7 @@ export function processIncident(incident: Incident, approvalGranted = false, app
       'RunbookAgent',
       'SUCCEEDED',
       `Selected ${runbook.name} (retrieval score ${runbook.score.toFixed(2)})`,
-      [`Grounded on ${runbook.steps.length} runbook steps`],
+      [`Grounded on ${runbook.steps.length} runbook steps`, 'Local TF-IDF cosine retrieval; no external embedding API required'],
       5,
     ),
     step('RootCauseAgent', 'SUCCEEDED', 'Generated bounded root-cause hypotheses', rootCauses, 11),
