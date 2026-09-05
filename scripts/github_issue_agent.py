@@ -16,11 +16,27 @@ from src.orchestrator import IncidentOrchestrator
 
 
 def field(body: str, heading: str, default: str = "") -> str:
-    pattern = rf"###\s+{re.escape(heading)}\s*\n+(.+?)(?=\n###\s+|\Z)"
-    match = re.search(pattern, body, re.I | re.S)
-    if not match:
+    """Read one GitHub issue-form Markdown field without spilling into the next heading."""
+    target = heading.strip().casefold()
+    lines = body.splitlines()
+    start: int | None = None
+
+    for index, line in enumerate(lines):
+        match = re.match(r"^###\s+(.+?)\s*$", line)
+        if match and match.group(1).strip().casefold() == target:
+            start = index + 1
+            break
+
+    if start is None:
         return default
-    value = match.group(1).strip()
+
+    collected: list[str] = []
+    for line in lines[start:]:
+        if re.match(r"^###\s+", line):
+            break
+        collected.append(line)
+
+    value = "\n".join(collected).strip()
     return "" if value == "_No response_" else value
 
 
