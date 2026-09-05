@@ -24,7 +24,7 @@ class TriageAgent:
             "data loss", "security breach", "cannot checkout", "cannot complete checkout",
         ]
         medium = [
-            "degraded", "timeout", "timeouts", "latency", "multiple users", "failed jobs",
+            "degraded", "timeout", "latency", "multiple users", "failed jobs",
             "queue backlog", "queue depth", "worker processing", "delayed", "errors", "connection failures",
         ]
 
@@ -191,7 +191,12 @@ class CommunicationsAgent:
         approval: bool,
         status: str,
     ) -> str:
-        gate = "Human approval requested" if approval and status == "WAITING_FOR_APPROVAL" else "Governance checks passed"
+        if approval and status == "WAITING_FOR_APPROVAL":
+            gate = "Human approval requested"
+        elif status == "ACTION_BLOCKED":
+            gate = "Remediation blocked by governance or operator decision"
+        else:
+            gate = "Governance checks passed"
         return (
             f"[{severity}] {incident.service}: {incident.title}. {gate}. "
             f"Workflow status: {status}. Next action: {action}. "
