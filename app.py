@@ -72,7 +72,10 @@ def render_result(result):
             st.write(f"- {item}")
 
     st.markdown("#### Stakeholder communication")
-    st.success(result.stakeholder_message)
+    if result.status == "ACTION_BLOCKED":
+        st.warning(result.stakeholder_message)
+    else:
+        st.success(result.stakeholder_message)
 
     with st.expander("Full multi-agent trace"):
         for step in result.agent_trace:
@@ -92,34 +95,38 @@ with tab1:
     left, right = st.columns([0.95, 1.05])
     with left:
         st.subheader("Inject an operational event")
-        title = st.text_input("Incident title", "Checkout API timeouts")
+        title = st.text_input("Incident title", "Checkout API timeouts", max_chars=240)
         description = st.text_area(
             "Description",
             "Production checkout requests are timing out for multiple users after a deployment.",
             height=110,
+            max_chars=6000,
         )
         service = st.selectbox(
             "Service", ["checkout-api", "order-processing", "customer-db", "analytics", "generic-service"]
         )
         environment = st.selectbox("Environment", ["production", "staging", "development"])
-        impact = st.text_input("Customer impact", "Multiple customers cannot complete checkout")
+        impact = st.text_input("Customer impact", "Multiple customers cannot complete checkout", max_chars=2000)
         recent_change = st.checkbox("Recent deployment/change detected", value=True)
         run = st.button("Run autonomous workflow", type="primary", use_container_width=True)
 
         if run:
-            incident = Incident(
-                incident_id=f"INC-{uuid.uuid4().hex[:6].upper()}",
-                title=title,
-                description=description,
-                service=service,
-                environment=environment,
-                customer_impact=impact,
-                recent_change=recent_change,
-                source="streamlit-event",
-            )
-            result = orchestrator.process(incident)
-            st.session_state.last_incident = incident
-            st.session_state.last_result = result
+            if not title.strip() or not description.strip() or not impact.strip():
+                st.error("Incident title, description and customer impact are required.")
+            else:
+                incident = Incident(
+                    incident_id=f"INC-{uuid.uuid4().hex[:6].upper()}",
+                    title=title.strip(),
+                    description=description.strip(),
+                    service=service.strip().lower(),
+                    environment=environment.strip().lower(),
+                    customer_impact=impact.strip(),
+                    recent_change=recent_change,
+                    source="streamlit-event",
+                )
+                result = orchestrator.process(incident)
+                st.session_state.last_incident = incident
+                st.session_state.last_result = result
 
     with right:
         if st.session_state.last_result:
@@ -150,7 +157,9 @@ with tab2:
                 st.rerun()
         with b:
             if st.button("Reject and keep escalated", use_container_width=True):
-                st.info("Approval rejected. No mutating tool was executed.")
+                rejected = orchestrator.process(incident, approval_rejected=True)
+                st.session_state.last_result = rejected
+                st.rerun()
 
 with tab3:
     st.subheader("Measured agent evaluation")
