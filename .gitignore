@@ -8,3 +8,7 @@ activity_log.jsonl
 .tmp/
 state/
 .DS_Store
+frontend/node_modules/
+frontend/.next/
+frontend/.vercel/
+frontend/.env*.local

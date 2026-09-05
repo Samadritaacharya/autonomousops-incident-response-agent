@@ -46,7 +46,13 @@ class IncidentOrchestrator:
         duration = int((time.perf_counter() - start) * 1000)
         return value, duration
 
-    def process(self, incident: Incident, *, approval_granted: bool = False) -> AgentResult:
+    def process(
+        self,
+        incident: Incident,
+        *,
+        approval_granted: bool = False,
+        approval_rejected: bool = False,
+    ) -> AgentResult:
         trace_id = f"TRC-{uuid.uuid4().hex[:10].upper()}"
         trace: list[AgentStep] = []
         tool_executions: list[ToolExecution] = []
@@ -107,13 +113,21 @@ class IncidentOrchestrator:
             )
         )
 
-        # Read-only diagnostics are always safe and produce observable tool use.
         diagnostics = self.tools.collect_diagnostics(incident)
         tool_executions.append(diagnostics)
 
         approval_id = None
         action = proposed_action
-        if requires_approval and not approval_granted:
+        if approval_rejected:
+            tool_executions.append(
+                ToolExecution(
+                    "human approval",
+                    "BLOCKED",
+                    f"Operator rejected remediation '{proposed_action}' on {incident.service}.",
+                )
+            )
+            status = "ACTION_BLOCKED"
+        elif requires_approval and not approval_granted:
             approval = self.tools.request_approval(incident, proposed_action)
             approval_id = approval["approval_id"]
             tool_executions.append(
