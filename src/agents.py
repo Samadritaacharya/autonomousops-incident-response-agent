@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+import math
 from pathlib import Path
 from typing import Dict, List, Tuple
 import re
@@ -9,6 +11,15 @@ from .models import Incident
 
 
 SEVERITY_SLA = {"P1": 15, "P2": 30, "P3": 120, "P4": 480}
+
+
+def _signal_present(text: str, term: str) -> bool:
+    """Match a signal unless it is immediately negated (for example, 'no outage')."""
+    if term not in text:
+        return False
+    escaped = re.escape(term).replace(r"\ ", r"\s+")
+    negated = re.compile(rf"\b(?:no|not|without|never)\s+(?:\w+\s+){{0,2}}{escaped}\b")
+    return negated.search(text) is None
 
 
 class TriageAgent:
@@ -29,11 +40,11 @@ class TriageAgent:
         ]
 
         for term in high:
-            if term in text:
+            if _signal_present(text, term):
                 score += 3
                 evidence.append(f"High-impact signal: '{term}'")
         for term in medium:
-            if term in text:
+            if _signal_present(text, term):
                 score += 1
                 evidence.append(f"Degradation signal: '{term}'")
 
@@ -59,7 +70,7 @@ class TriageAgent:
 
 
 class RunbookAgent:
-    """Retrieves the best grounded runbook using token overlap plus service affinity."""
+    """Retrieves the best grounded runbook with local TF-IDF cosine similarity plus service affinity."""
 
     SERVICE_HINTS = {
         "checkout-api": "api-latency.md",
@@ -67,36 +78,84 @@ class RunbookAgent:
         "customer-db": "database.md",
         "analytics": "generic-incident.md",
     }
+    GENERIC_THRESHOLD = 0.08
 
     def __init__(self, runbook_dir: str = "knowledge/runbooks"):
         self.runbook_dir = Path(runbook_dir)
 
     @staticmethod
-    def _tokens(text: str) -> set[str]:
-        return set(re.findall(r"[a-z0-9]+", text.lower()))
+    def _tokens(text: str) -> List[str]:
+        return re.findall(r"[a-z0-9]+", text.lower())
+
+    @staticmethod
+    def _vector(tokens: List[str], idf: Dict[str, float], unknown_idf: float) -> Dict[str, float]:
+        counts = Counter(tokens)
+        return {
+            term: (1.0 + math.log(count)) * idf.get(term, unknown_idf)
+            for term, count in counts.items()
+        }
+
+    @staticmethod
+    def _cosine(left: Dict[str, float], right: Dict[str, float]) -> float:
+        if not left or not right:
+            return 0.0
+        dot = sum(weight * right.get(term, 0.0) for term, weight in left.items())
+        left_norm = math.sqrt(sum(weight * weight for weight in left.values()))
+        right_norm = math.sqrt(sum(weight * weight for weight in right.values()))
+        if not left_norm or not right_norm:
+            return 0.0
+        return dot / (left_norm * right_norm)
 
     def run(self, incident: Incident) -> Tuple[str, List[str], float]:
-        query = self._tokens(f"{incident.service} {incident.title} {incident.description}")
-        preferred = self.SERVICE_HINTS.get(incident.service)
-        best_name = "generic-incident.md"
-        best_score = -1.0
-        best_steps: List[str] = []
+        documents = {
+            path.name: path.read_text(encoding="utf-8")
+            for path in self.runbook_dir.glob("*.md")
+        }
+        if not documents:
+            return "generic-incident.md", [], 0.0
 
-        for path in self.runbook_dir.glob("*.md"):
-            content = path.read_text(encoding="utf-8")
-            tokens = self._tokens(content)
-            score = len(query & tokens) / max(len(query | tokens), 1)
-            if path.name == preferred:
+        tokenized = {name: self._tokens(content) for name, content in documents.items()}
+        document_frequency: Counter[str] = Counter()
+        for tokens in tokenized.values():
+            document_frequency.update(set(tokens))
+
+        count = len(documents)
+        idf = {
+            term: math.log((1 + count) / (1 + frequency)) + 1.0
+            for term, frequency in document_frequency.items()
+        }
+        unknown_idf = math.log((1 + count) / 1) + 1.0
+        vectors = {
+            name: self._vector(tokens, idf, unknown_idf)
+            for name, tokens in tokenized.items()
+        }
+        query = self._vector(
+            self._tokens(f"{incident.service} {incident.title} {incident.description}"),
+            idf,
+            unknown_idf,
+        )
+
+        preferred = self.SERVICE_HINTS.get(incident.service)
+        best_name = "generic-incident.md" if "generic-incident.md" in documents else next(iter(documents))
+        best_score = -1.0
+        for name, vector in vectors.items():
+            score = self._cosine(query, vector)
+            if name == preferred:
                 score += 0.35
             if score > best_score:
                 best_score = score
-                best_name = path.name
-                best_steps = [
-                    line[2:].strip()
-                    for line in content.splitlines()
-                    if line.strip().startswith("- ")
-                ][:8]
-        return best_name, best_steps, max(best_score, 0.0)
+                best_name = name
+
+        if preferred is None and best_score < self.GENERIC_THRESHOLD and "generic-incident.md" in documents:
+            best_name = "generic-incident.md"
+
+        content = documents[best_name]
+        steps = [
+            line[2:].strip()
+            for line in content.splitlines()
+            if line.strip().startswith("- ")
+        ][:8]
+        return best_name, steps, max(best_score, 0.0)
 
 
 class RootCauseAgent:
