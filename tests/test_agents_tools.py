@@ -94,7 +94,7 @@ def test_root_cause_agent_uses_bounded_generated_hypotheses():
             return ["one", "two", "three", "four"]
 
     result = RootCauseAgent(FakeReasoner()).run(incident(), "generic-incident.md", ["Collect diagnostics"])
-    assert result == ["one", "two", "three", "four"]
+    assert result == ["one", "two", "three"]
 
 
 def test_root_cause_agent_fallback_is_service_aware_and_bounded():
