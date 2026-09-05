@@ -2,7 +2,11 @@
 
 import { ShaderGradient, ShaderGradientCanvas } from '@shadergradient/react'
 
-export function ShaderGradientBackdrop() {
+type ShaderGradientBackdropProps = {
+  reducedMotion?: boolean
+}
+
+export function ShaderGradientBackdrop({ reducedMotion = false }: ShaderGradientBackdropProps) {
   return (
     <div className="shader-gradient" aria-hidden="true">
       <ShaderGradientCanvas
@@ -14,11 +18,11 @@ export function ShaderGradientBackdrop() {
         <ShaderGradient
           control="props"
           type="plane"
-          animate="on"
+          animate={reducedMotion ? 'off' : 'on'}
           color1="#00d992"
           color2="#101010"
           color3="#5e6ad2"
-          uSpeed={0.12}
+          uSpeed={reducedMotion ? 0 : 0.12}
           uStrength={1.4}
           uDensity={1.2}
           uFrequency={4.4}
