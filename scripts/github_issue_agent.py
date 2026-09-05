@@ -24,6 +24,14 @@ def field(body: str, heading: str, default: str = "") -> str:
     return "" if value == "_No response_" else value
 
 
+def first_line(value: str, default: str) -> str:
+    for line in value.splitlines():
+        normalized = line.strip()
+        if normalized:
+            return normalized
+    return default
+
+
 def parse_bool(value: str) -> bool:
     return value.strip().lower() in {"yes", "true", "y", "1", "recent change detected"}
 
@@ -55,14 +63,27 @@ def main() -> int:
         print("GITHUB_EVENT_PATH and GITHUB_REPOSITORY are required")
         return 1
 
-    with open(event_path, encoding="utf-8") as handle:
-        event = json.load(handle)
+    try:
+        with open(event_path, encoding="utf-8") as handle:
+            event = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Unable to read GitHub event payload: {exc}")
+        return 1
 
     issue = event.get("issue", {})
+    if not isinstance(issue, dict):
+        print("GitHub event did not include a valid issue object")
+        return 1
+
     issue_number = int(issue.get("number", 0) or 0)
-    body = issue.get("body") or ""
-    labels = {str(x.get("name", "")).lower() for x in issue.get("labels", [])}
-    title = issue.get("title", "Untitled incident")
+    body = str(issue.get("body") or "")
+    raw_labels = issue.get("labels", [])
+    labels = {
+        str(item.get("name", "")).lower()
+        for item in raw_labels
+        if isinstance(item, dict)
+    }
+    title = str(issue.get("title") or "Untitled incident")
 
     is_incident = (
         "incident" in labels
@@ -74,10 +95,16 @@ def main() -> int:
         return 0
 
     approval_granted = False
+    approval_rejected = False
+    actor = ""
     if event_name == "issue_comment":
         comment = event.get("comment", {})
-        command = (comment.get("body") or "").strip().lower()
-        actor = str(comment.get("user", {}).get("login", ""))
+        if not isinstance(comment, dict):
+            print("Issue-comment event did not include a valid comment object")
+            return 1
+        command = str(comment.get("body") or "").strip().lower()
+        user = comment.get("user", {})
+        actor = str(user.get("login", "")) if isinstance(user, dict) else ""
         association = str(comment.get("author_association", "")).upper()
         repo_owner = repo.split("/", 1)[0].lower()
         authorized = association in {"OWNER", "MEMBER", "COLLABORATOR"} or actor.lower() == repo_owner
@@ -85,41 +112,49 @@ def main() -> int:
             print(f"Ignoring approval command from unauthorized actor: {actor}")
             return 0
         if command.startswith("/reject"):
-            rendered = (
-                "## 🛑 AutonomousOps approval rejected\n"
-                f"**Approved by:** no — rejected by `@{actor}`\n\n"
-                "No mutating remediation was executed. The incident remains escalated for human handling."
-            )
-            if token and issue_number:
-                post_comment(repo, issue_number, token, rendered)
-            else:
-                print(rendered)
-            return 0
-        if not command.startswith("/approve"):
+            approval_rejected = True
+        elif command.startswith("/approve"):
+            approval_granted = True
+        else:
             print("Comment is not an approval command; skipping.")
             return 0
-        approval_granted = True
 
-    service = field(body, "Service", "generic-service").splitlines()[0].strip()
-    environment = field(body, "Environment", "production").splitlines()[0].strip().lower()
-    impact = field(body, "Customer impact", body[:240] or "Impact not specified")
-    description = field(body, "What happened?", body or title)
+    service = first_line(field(body, "Service", "generic-service"), "generic-service").lower()
+    environment = first_line(field(body, "Environment", "production"), "production").lower()
+    impact = field(body, "Customer impact", body[:240] or "Impact not specified").strip() or "Impact not specified"
+    description = field(body, "What happened?", body or title).strip() or title
     recent_raw = field(body, "Recent change or deployment?", "")
 
     incident = Incident(
         incident_id=f"GH-{issue.get('number', 'UNKNOWN')}",
-        title=title.replace("[INCIDENT]", "").replace("[incident]", "").strip(),
+        title=re.sub(r"^\[incident\]\s*", "", title, flags=re.I).strip() or "Untitled incident",
         description=description,
         service=service,
         environment=environment,
         customer_impact=impact,
         recent_change=parse_bool(recent_raw) or any(x in body.lower() for x in ["deploy", "release", "change"]),
-        source="github-issue-approval" if approval_granted else "github-issue",
-        reporter=str(issue.get("user", {}).get("login", "github-user")),
+        source=(
+            "github-issue-rejection"
+            if approval_rejected
+            else "github-issue-approval"
+            if approval_granted
+            else "github-issue"
+        ),
+        reporter=str(issue.get("user", {}).get("login", "github-user")) if isinstance(issue.get("user", {}), dict) else "github-user",
     )
-    result = IncidentOrchestrator().process(incident, approval_granted=approval_granted)
+    result = IncidentOrchestrator().process(
+        incident,
+        approval_granted=approval_granted,
+        approval_rejected=approval_rejected,
+    )
 
-    heading = "## ✅ AutonomousOps approved remediation" if approval_granted else "## 🤖 AutonomousOps incident orchestration"
+    if approval_rejected:
+        heading = "## 🛑 AutonomousOps remediation rejected"
+    elif approval_granted:
+        heading = "## ✅ AutonomousOps approved remediation"
+    else:
+        heading = "## 🤖 AutonomousOps incident orchestration"
+
     comment = [
         heading,
         f"**Trace:** `{result.trace_id}`  ",
@@ -144,7 +179,14 @@ def main() -> int:
         "",
         "> Portfolio-safe automation: infrastructure mutations are simulated; approval gates are enforced.",
     ]
-    if not approval_granted and result.status == "WAITING_FOR_APPROVAL":
+
+    if approval_rejected:
+        comment += [
+            "",
+            "### Human decision",
+            f"Rejected by `@{actor or 'authorized-operator'}`. No mutating remediation was executed.",
+        ]
+    elif not approval_granted and result.status == "WAITING_FOR_APPROVAL":
         comment += [
             "",
             "### Human decision",
