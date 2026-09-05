@@ -3,9 +3,26 @@
 **Event-driven agentic AI orchestration for incident triage, grounded runbook retrieval, governed tool use, human approval and stakeholder communication.**
 
 [![CI](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/ci.yml)
+[![Command Center CI](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/frontend-ci.yml)
 [![Autonomous incident agent](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/incident-agent-demo.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/incident-agent-demo.yml)
 
 > **Portfolio-safe by design:** all datasets are synthetic and all infrastructure mutations are simulated. The project demonstrates orchestration, tool selection and governance without touching a real production environment.
+
+## Interactive Command Center
+
+The repository now includes a modern **Next.js 16 / React 19 command center** in [`frontend/`](frontend/). It is a zero-required-paid-service recruiter experience with a live incident simulator, human approval/rejection path, complete agent/tool trace, React Three Fiber orchestration graph, ShaderGradient motion, reproducible evaluation metrics and local-only run history.
+
+The public web runtime intentionally requires **no model key, database, login, telemetry service or paid API**. Its deterministic TypeScript engine mirrors the Python governance contract, while the existing Python implementation remains the canonical full backend and optional generative-reasoning implementation.
+
+Run it locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+For a public demo, Vercel can use `frontend` as the Root Directory. Vercel Hobby is a free hosting option within its published quotas; the app itself is not coupled to Vercel and runs on any compatible Node host. See [`frontend/README.md`](frontend/README.md), [`frontend/DESIGN.md`](frontend/DESIGN.md) and [`docs/web-command-center.md`](docs/web-command-center.md).
 
 ## Verified end-to-end proof
 
@@ -54,20 +71,23 @@ flowchart TD
 
 | Capability | Implementation |
 |---|---|
+| Interactive web command center | Next.js 16 + React 19 |
+| Web 3D / motion layer | React Three Fiber + ShaderGradient + Motion |
+| Zero-key hosted demo backend | Next.js route handlers + deterministic TypeScript agent contract |
 | Event-driven trigger | GitHub Issues → GitHub Actions |
-| Recruiter UI | Streamlit |
-| Machine-to-machine endpoint | FastAPI |
+| Recruiter UI | Next.js command center + Streamlit |
+| Machine-to-machine endpoint | FastAPI + Next.js incident route |
 | Triage Agent | Severity + SLA classification |
 | Runbook Agent | Grounded retrieval from repository knowledge |
 | Root-Cause Agent | Optional LLM reasoning with deterministic fallback |
 | Risk Agent | Deterministic approval policy |
 | Resolution Agent | Grounded allowlisted action selection |
 | Tool Executor | Diagnostics + safe remediation simulation |
-| Human-in-the-loop | Streamlit/API approval + GitHub `/approve` / `/reject` resume path |
+| Human-in-the-loop | Web UI + Streamlit/API + GitHub `/approve` / `/reject` resume path |
 | Communications Agent | Stakeholder-ready incident update |
 | AgentOps | Trace IDs, per-agent evidence and JSONL audit log |
-| Evaluation | Checked-in test set + pytest + reproducible evaluation command |
-| CI | Compile, tests, evaluation, CLI, Streamlit, FastAPI and Docker smoke checks |
+| Evaluation | Checked-in test set + pytest + reproducible Python/TypeScript evaluation |
+| CI | Python compile/tests/evaluation/UI/API/Docker + web typecheck/tests/build/HTTP smoke |
 | Containerization | Docker + docker-compose |
 | Copilot Studio mapping | Detailed enterprise implementation blueprint |
 
@@ -86,7 +106,7 @@ flowchart TD
 
 The optional generative model **cannot authorize tools**. Model output can enrich hypotheses, but severity, approval requirements and write-capable tool execution remain deterministic. That prevents a probabilistic model from self-authorizing a production-impacting action.
 
-## Quick start
+## Python quick start
 
 ```bash
 python -m venv .venv
@@ -151,7 +171,7 @@ docker compose up --build
 - FastAPI: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 
-See [docs/deployment.md](docs/deployment.md) for the public deployment path.
+See [docs/deployment.md](docs/deployment.md) for the Python public deployment path and [docs/web-command-center.md](docs/web-command-center.md) for the zero-key web architecture.
 
 ## Autonomous GitHub demo
 
@@ -170,12 +190,23 @@ No separate `incident` label is required.
 
 ## Evaluation
 
+Python:
+
 ```bash
 python -m pytest -q
 python scripts/evaluate.py
 ```
 
-Or open the **Evaluation** tab in Streamlit. Metrics are computed directly from the 8 checked-in synthetic cases in `data/sample_incidents.csv`.
+Command center:
+
+```bash
+cd frontend
+npm run typecheck
+npm test
+npm run build
+```
+
+The eight checked-in synthetic cases in `data/sample_incidents.csv` are mirrored by the web evaluation fixtures so the public command center can prove severity, runbook and approval-gate behavior without an external service.
 
 The repository deliberately does **not** hard-code impressive-looking portfolio metrics. Only measured results should be added to a CV or LinkedIn project description.
 
@@ -183,10 +214,17 @@ The repository deliberately does **not** hard-code impressive-looking portfolio 
 
 ```text
 .
-├── app.py                         # Streamlit recruiter experience
-├── api.py                         # FastAPI event endpoint
+├── frontend/                       # Next.js interactive command center
+│   ├── app/                        # UI + route handlers
+│   ├── components/                 # motion, 3D graph, simulator
+│   ├── lib/                        # deterministic web agent contract
+│   ├── tests/                      # parity + governance tests
+│   ├── DESIGN.md
+│   └── README.md
+├── app.py                          # Streamlit recruiter experience
+├── api.py                          # FastAPI event endpoint
 ├── src/
-│   ├── agents.py                  # specialist agents
+│   ├── agents.py                   # specialist agents
 │   ├── evaluator.py               # measured evaluation
 │   ├── llm.py                     # optional generative reasoning
 │   ├── models.py                  # incident/trace models
@@ -202,7 +240,8 @@ The repository deliberately does **not** hard-code impressive-looking portfolio 
 │   ├── architecture.md
 │   ├── copilot-studio-implementation.md
 │   ├── demo-script.md
-│   └── deployment.md
+│   ├── deployment.md
+│   └── web-command-center.md
 ├── tests/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/incident.yml
@@ -230,7 +269,7 @@ The public Python/GitHub implementation makes the architecture inspectable by re
 
 ## CV-ready project line
 
-> **AutonomousOps — Agentic AI Incident Response:** Built an event-driven multi-agent incident-response system orchestrating severity triage, runbook grounding, optional generative root-cause reasoning, governed tool execution, human approval gates, stakeholder communication and auditable AgentOps evaluation using Python, Streamlit, FastAPI and GitHub Actions, with a Microsoft Copilot Studio enterprise implementation blueprint.
+> **AutonomousOps — Agentic AI Incident Response:** Built an event-driven multi-agent incident-response system orchestrating severity triage, runbook grounding, optional generative root-cause reasoning, governed tool execution, human approval gates, stakeholder communication and auditable AgentOps evaluation using Python, Next.js, React Three Fiber, Streamlit, FastAPI and GitHub Actions, with a Microsoft Copilot Studio enterprise implementation blueprint.
 
 ## Safety
 
