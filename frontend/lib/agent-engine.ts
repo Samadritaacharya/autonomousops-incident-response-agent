@@ -79,7 +79,6 @@ const highSignals = [
 const mediumSignals = [
   'degraded',
   'timeout',
-  'timeouts',
   'latency',
   'multiple users',
   'failed jobs',
@@ -204,14 +203,6 @@ function diagnostic(incident: Incident): ToolExecution {
 
 function execute(action: string, incident: Incident, approved: boolean): ToolExecution {
   const normalized = action.toLowerCase().trim()
-  if (normalized.includes('collect diagnostics')) {
-    return {
-      tool: 'collect diagnostics',
-      status: 'SUCCEEDED',
-      message: 'Read-only diagnostic tool executed.',
-      simulated: true,
-    }
-  }
   const safe = safeActions.find((item) => normalized.includes(item))
   if (safe) {
     if (approved || incident.environment.toLowerCase() !== 'production') {
@@ -226,6 +217,14 @@ function execute(action: string, incident: Incident, approved: boolean): ToolExe
       tool: safe,
       status: 'BLOCKED',
       message: 'Production mutation blocked because explicit approval was not provided.',
+      simulated: true,
+    }
+  }
+  if (normalized.includes('collect diagnostics')) {
+    return {
+      tool: 'collect diagnostics',
+      status: 'SUCCEEDED',
+      message: 'Read-only diagnostic tool executed.',
       simulated: true,
     }
   }
@@ -257,7 +256,7 @@ export function processIncident(incident: Incident, approvalGranted = false, app
   let status: WorkflowStatus
   let approvalId: string | null = null
 
-  if (risk.requiresApproval && approvalRejected) {
+  if (approvalRejected) {
     tools.push({
       tool: 'human approval',
       status: 'BLOCKED',
@@ -314,9 +313,11 @@ export function processIncident(incident: Incident, approvalGranted = false, app
     step('CommunicationsAgent', 'SUCCEEDED', 'Generated stakeholder update', [], 4),
   ]
 
-  const gate = risk.requiresApproval && status === 'WAITING_FOR_APPROVAL'
-    ? 'Human approval requested'
-    : 'Governance checks passed'
+  const gate = approvalRejected
+    ? 'Human approval rejected'
+    : risk.requiresApproval && status === 'WAITING_FOR_APPROVAL'
+      ? 'Human approval requested'
+      : 'Governance checks passed'
 
   return {
     severity: triage.severity,
