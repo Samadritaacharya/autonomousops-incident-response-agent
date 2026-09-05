@@ -1,20 +1,44 @@
-# AutonomousOps — AI Incident Response & Service Recovery Agent
+# AutonomousOps — AI Incident Governance & Service Recovery
 
-**Event-driven agentic AI orchestration for incident triage, grounded runbook retrieval, governed tool use, human approval and stakeholder communication.**
+**Event-driven incident response with deterministic risk controls, grounded runbook retrieval, human approval gates, simulated remediation, stakeholder communication, and auditable AgentOps.**
 
 [![CI](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/ci.yml)
 [![Command Center CI](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/frontend-ci.yml)
 [![Autonomous incident agent](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/incident-agent-demo.yml/badge.svg)](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/actions/workflows/incident-agent-demo.yml)
 
-> **Portfolio-safe by design:** all datasets are synthetic and all infrastructure mutations are simulated. The project demonstrates orchestration, tool selection and governance without touching a real production environment.
+> **Portfolio-safe by design:** all incidents are synthetic and every infrastructure mutation is simulated. The project demonstrates enterprise orchestration and governance without touching a real production system.
+
+## Recruiter snapshot
+
+| Proof point | Verified result |
+|---|---:|
+| Labeled synthetic evaluation cases | **24** |
+| Severity classification | **24/24 — 100%** |
+| Runbook selection | **24/24 — 100%** |
+| Approval-gate policy | **24/24 — 100%** |
+| Python unit/governance tests | **38/38 passed** |
+| Command-center typecheck/tests/build/API smoke | **Passed in CI** |
+| Required paid runtime services | **0** |
+
+These are **CI-verified results on the checked-in synthetic evaluation set**, not claims about production reliability or real-world ML accuracy. The evaluation is intentionally reproducible and inspectable.
 
 ## Interactive Command Center
 
-The repository now includes a modern **Next.js 16 / React 19 command center** in [`frontend/`](frontend/). It is a zero-required-paid-service recruiter experience with a live incident simulator, human approval/rejection path, complete agent/tool trace, React Three Fiber orchestration graph, ShaderGradient motion, reproducible evaluation metrics and local-only run history.
+`frontend/` contains a **Next.js 16 / React 19** incident command center with:
 
-The public web runtime intentionally requires **no model key, database, login, telemetry service or paid API**. Its deterministic TypeScript engine mirrors the Python governance contract, while the existing Python implementation remains the canonical full backend and optional generative-reasoning implementation.
+- editable synthetic incident simulator
+- deterministic P1–P4 triage and SLA targets
+- grounded runbook retrieval
+- root-cause hypotheses with deterministic fallback
+- explicit approve/reject governance path
+- complete per-agent evidence and tool trace
+- React Three Fiber orchestration graph and motion layer
+- browser-local run history
+- `/api/health`, `/api/evaluation`, and `/api/incidents` route handlers
 
-Run it locally:
+The hosted demo requires **no model key, database, login, analytics service, or paid API**. The TypeScript engine mirrors the public governance contract while the Python implementation remains the canonical full backend.
+
+Run locally:
 
 ```bash
 cd frontend
@@ -22,31 +46,42 @@ npm install
 npm run dev
 ```
 
-For a public demo, Vercel can use `frontend` as the Root Directory. Vercel Hobby is a free hosting option within its published quotas; the app itself is not coupled to Vercel and runs on any compatible Node host. See [`frontend/README.md`](frontend/README.md), [`frontend/DESIGN.md`](frontend/DESIGN.md) and [`docs/web-command-center.md`](docs/web-command-center.md).
+Vercel can deploy `frontend` as the Root Directory. See [`frontend/README.md`](frontend/README.md), [`frontend/DESIGN.md`](frontend/DESIGN.md), and [`docs/web-command-center.md`](docs/web-command-center.md).
 
-## Verified end-to-end proof
+## What is AI — and what is deliberately deterministic?
 
-AutonomousOps has been exercised through a real GitHub event path, not just a local function call:
+AutonomousOps does **not** let a probabilistic model self-authorize operational changes.
 
-1. A synthetic `[INCIDENT]` issue triggered GitHub Actions.
-2. The agent classified the checkout outage as **P1**, grounded on `api-latency.md`, collected diagnostics and paused at the approval gate.
-3. An authorized `/approve` issue comment resumed the workflow.
-4. The allowlisted **scale worker** simulation executed successfully and GitHub Actions posted the final stakeholder/audit response.
-5. The demonstration issue was closed as completed.
+| Layer | Implementation | Why |
+|---|---|---|
+| Severity + SLA | Deterministic signals and policy | Stable, testable incident priority |
+| Runbook retrieval | **Local TF-IDF cosine vector retrieval + service affinity** | Better matching without an external embedding API |
+| Root-cause hypotheses | Optional generative model; deterministic fallback | Useful reasoning enrichment without making policy probabilistic |
+| Approval decision | Deterministic policy | Auditable human-control boundary |
+| Tool authorization | Allowlist + environment/approval checks | Prevents model output from becoming authority |
+| Remediation | Simulated tools only | Safe portfolio demonstration |
+
+The optional LLM can enrich **hypotheses only**. It cannot change severity, bypass approval, grant tool permission, or authorize a mutation.
+
+## Verified end-to-end event proof
+
+The system has been exercised through a real GitHub event path rather than only through local function calls:
+
+1. A synthetic `[INCIDENT]` GitHub issue triggers GitHub Actions.
+2. The orchestrator classifies severity, retrieves a runbook, collects diagnostics, and evaluates change risk.
+3. A high-risk incident pauses at the approval gate.
+4. Only an authorized repository `OWNER`, `MEMBER`, or `COLLABORATOR` can resume the GitHub workflow with `/approve`; `/reject` stops remediation.
+5. The allowlisted remediation simulation executes and the workflow posts the final stakeholder/audit response.
 
 **Proof run:** [Issue #1 — Checkout API timeouts after deployment](https://github.com/Samadritaacharya/autonomousops-incident-response-agent/issues/1)
 
 ## Why I built this
 
-Many AI portfolios stop at chatbots or dashboards. AutonomousOps demonstrates a harder enterprise pattern: an operational event starts the system, specialist agents build context, knowledge grounds the plan, deterministic policy controls risk, tools execute allowed steps, humans approve high-impact actions, stakeholders are updated and the complete run is auditable.
+Many AI portfolios stop at chatbots or dashboards. AutonomousOps demonstrates an enterprise operating pattern where an **event** starts the workflow, specialist components build context, knowledge grounds the proposed action, deterministic policy controls risk, humans approve high-impact actions, tools execute only allowlisted simulations, stakeholders receive updates, and the complete run is auditable.
 
-It is designed as an end-to-end demonstration of the skills behind my Microsoft Copilot Studio learning in:
+This maps directly to the operating concerns behind AI transformation, service management, PMO/governance, and autonomous-agent adoption: **control, traceability, escalation, approval, evidence, and measurable evaluation**.
 
-- building an initial agent
-- extending agents with tools, connectors and flows
-- making agents autonomous with event triggers, conditions, testing and monitoring
-
-## Business workflow
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -67,44 +102,73 @@ flowchart TD
     K --> L[Audit Trace + Evaluation]
 ```
 
-## What is actually working
+## What is working
 
 | Capability | Implementation |
 |---|---|
-| Interactive web command center | Next.js 16 + React 19 |
-| Web 3D / motion layer | React Three Fiber + ShaderGradient + Motion |
-| Zero-key hosted demo backend | Next.js route handlers + deterministic TypeScript agent contract |
+| Interactive command center | Next.js 16 + React 19 |
+| 3D / motion layer | React Three Fiber + ShaderGradient + Motion |
+| Zero-key hosted demo backend | Next.js route handlers + deterministic TypeScript contract |
 | Event-driven trigger | GitHub Issues → GitHub Actions |
-| Recruiter UI | Next.js command center + Streamlit |
-| Machine-to-machine endpoint | FastAPI + Next.js incident route |
-| Triage Agent | Severity + SLA classification |
-| Runbook Agent | Grounded retrieval from repository knowledge |
-| Root-Cause Agent | Optional LLM reasoning with deterministic fallback |
-| Risk Agent | Deterministic approval policy |
-| Resolution Agent | Grounded allowlisted action selection |
-| Tool Executor | Diagnostics + safe remediation simulation |
-| Human-in-the-loop | Web UI + Streamlit/API + GitHub `/approve` / `/reject` resume path |
-| Communications Agent | Stakeholder-ready incident update |
-| AgentOps | Trace IDs, per-agent evidence and JSONL audit log |
-| Evaluation | Checked-in test set + pytest + reproducible Python/TypeScript evaluation |
-| CI | Python compile/tests/evaluation/UI/API/Docker + web typecheck/tests/build/HTTP smoke |
+| Python recruiter UI | Streamlit |
+| Machine-to-machine API | FastAPI |
+| Triage | Severity + SLA classification with negation-aware signal handling |
+| Runbook grounding | Local TF-IDF cosine vector retrieval + deterministic service affinity |
+| Root-cause reasoning | Optional LLM + deterministic fallback, bounded to three hypotheses |
+| Risk governance | Deterministic approval policy |
+| Resolution | Grounded allowlisted action selection |
+| Tool execution | Diagnostics + portfolio-safe remediation simulation |
+| Human-in-the-loop | Web, Streamlit/API, and GitHub `/approve` / `/reject` flows |
+| Communications | Stakeholder-ready incident update |
+| AgentOps | Trace IDs, per-agent evidence, JSONL audit log |
+| Evaluation | 24 labeled synthetic cases + Python/TypeScript parity checks |
+| CI | Python compile/tests/eval/UI/API/Docker + web typecheck/tests/build/HTTP smoke |
 | Containerization | Docker + docker-compose |
-| Copilot Studio mapping | Detailed enterprise implementation blueprint |
+| Enterprise mapping | Microsoft Copilot Studio implementation blueprint |
 
-## Specialist agents
+## Specialist workflow
 
-1. **Triage Agent** — classifies P1-P4 severity and SLA target.
-2. **Runbook Retrieval Agent** — selects the most relevant operating procedure.
-3. **Root-Cause Agent** — generates bounded hypotheses from incident + runbook context.
+1. **Triage Agent** — classifies P1–P4 urgency and SLA target.
+2. **Runbook Retrieval Agent** — ranks repository runbooks in a local TF-IDF vector space, with deterministic service affinity when the service is known.
+3. **Root-Cause Agent** — generates bounded hypotheses from incident and runbook context.
 4. **Change-Risk Agent** — owns the deterministic approval boundary.
-5. **Resolution Agent** — selects an allowlisted candidate action.
+5. **Resolution Agent** — selects an allowlisted candidate action from grounded steps.
 6. **Tool Executor** — runs diagnostics and safe remediation simulations.
-7. **Communications Agent** — produces the stakeholder update.
+7. **Communications Agent** — produces stakeholder updates.
 8. **Orchestrator** — sequences the workflow and preserves the trace.
 
-### Important governance design
+## Evaluation and parity
 
-The optional generative model **cannot authorize tools**. Model output can enrich hypotheses, but severity, approval requirements and write-capable tool execution remain deterministic. That prevents a probabilistic model from self-authorizing a production-impacting action.
+The Python evaluator reads `data/sample_incidents.csv`; the web command center evaluates the same 24 scenarios from a checked-in JSON mirror. A dedicated parity test fails CI if the two sets drift.
+
+The dataset includes known and unknown services, API latency, queue backlog, database failures, generic low-risk incidents, staging/production differences, recent-change governance, and negated language such as **“no outage”** and **“no errors.”**
+
+Run the Python evaluation:
+
+```bash
+python -m pytest -q
+python scripts/evaluate.py
+```
+
+Run the command-center checks:
+
+```bash
+cd frontend
+npm run typecheck
+npm test
+npm run build
+```
+
+Current CI-verified synthetic baseline:
+
+```text
+cases:                  24
+severity_accuracy:      1.00
+runbook_accuracy:       1.00
+approval_gate_accuracy: 1.00
+```
+
+These metrics describe this repository's labeled synthetic test set only. They should not be presented as production incident-resolution rates.
 
 ## Python quick start
 
@@ -119,20 +183,18 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Then open the Streamlit URL shown in your terminal.
-
 ### Optional generative reasoning
 
-The repository works without model credentials. To enable the optional Root-Cause Agent LLM layer:
+The repository works with no model credentials. To enable the optional Root-Cause Agent LLM layer:
 
 ```bash
 cp .env.example .env
 # add OPENAI_API_KEY to .env
 ```
 
-The deterministic fallback remains active if no key is present or the model call fails. Severity, approval and tool permissions remain deterministic in both modes.
+If the model is disabled or unavailable, the deterministic fallback remains active. Severity, approvals, and tool permissions are deterministic in both modes.
 
-## Run the API
+## API
 
 ```bash
 uvicorn api:app --reload
@@ -144,7 +206,7 @@ Health check:
 curl http://127.0.0.1:8000/health
 ```
 
-Incident event:
+Synthetic incident:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/v1/incidents" \
@@ -160,7 +222,7 @@ curl -X POST "http://127.0.0.1:8000/v1/incidents" \
   }'
 ```
 
-## Run with Docker
+## Docker
 
 ```bash
 cp .env.example .env
@@ -171,44 +233,16 @@ docker compose up --build
 - FastAPI: `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 
-See [docs/deployment.md](docs/deployment.md) for the Python public deployment path and [docs/web-command-center.md](docs/web-command-center.md) for the zero-key web architecture.
-
 ## Autonomous GitHub demo
-
-This is the most recruiter-friendly proof that the project is **event driven rather than chat only**.
 
 1. Open **Issues → New issue**.
 2. Choose **AutonomousOps incident demo**.
-3. Use a synthetic scenario and submit it.
-4. The issue title starts with `[INCIDENT]`, which triggers `.github/workflows/incident-agent-demo.yml`.
-5. GitHub Actions runs the complete orchestrator.
-6. The agent posts severity, runbook, hypotheses, tool trace, governance evidence and the stakeholder update back to the issue.
-7. If the risk gate pauses the workflow, an authorized repository owner/collaborator comments `/approve` to resume the safe simulation or `/reject` to stop it.
-8. The resumed workflow posts the final tool execution and stakeholder update back to the issue.
+3. Submit a synthetic incident.
+4. GitHub Actions runs the orchestration workflow.
+5. The agent posts severity, runbook, hypotheses, evidence, tool trace, governance state, and stakeholder update.
+6. If the workflow pauses, an authorized repository owner/member/collaborator comments `/approve` to resume or `/reject` to stop.
 
 No separate `incident` label is required.
-
-## Evaluation
-
-Python:
-
-```bash
-python -m pytest -q
-python scripts/evaluate.py
-```
-
-Command center:
-
-```bash
-cd frontend
-npm run typecheck
-npm test
-npm run build
-```
-
-The eight checked-in synthetic cases in `data/sample_incidents.csv` are mirrored by the web evaluation fixtures so the public command center can prove severity, runbook and approval-gate behavior without an external service.
-
-The repository deliberately does **not** hard-code impressive-looking portfolio metrics. Only measured results should be added to a CV or LinkedIn project description.
 
 ## Repository structure
 
@@ -217,60 +251,54 @@ The repository deliberately does **not** hard-code impressive-looking portfolio 
 ├── frontend/                       # Next.js interactive command center
 │   ├── app/                        # UI + route handlers
 │   ├── components/                 # motion, 3D graph, simulator
-│   ├── lib/                        # deterministic web agent contract
-│   ├── tests/                      # parity + governance tests
+│   ├── lib/                        # deterministic web agent + evaluation fixtures
+│   ├── tests/                      # web governance and parity tests
 │   ├── DESIGN.md
 │   └── README.md
 ├── app.py                          # Streamlit recruiter experience
-├── api.py                          # FastAPI event endpoint
+├── api.py                          # FastAPI endpoint
 ├── src/
-│   ├── agents.py                   # specialist agents
-│   ├── evaluator.py               # measured evaluation
-│   ├── llm.py                     # optional generative reasoning
-│   ├── models.py                  # incident/trace models
-│   ├── orchestrator.py            # multi-agent workflow
-│   └── tools.py                   # governed tool layer
+│   ├── agents.py                   # triage, vector retrieval, reasoning, risk, resolution
+│   ├── evaluator.py                # measured evaluation
+│   ├── llm.py                      # optional generative reasoning
+│   ├── models.py                   # incident/trace models
+│   ├── orchestrator.py             # workflow sequencing
+│   └── tools.py                    # governed tool layer
 ├── scripts/
-│   ├── evaluate.py                # reproducible evaluation command
+│   ├── evaluate.py
 │   ├── simulate_incident.py
 │   └── github_issue_agent.py
-├── knowledge/runbooks/            # grounded operating procedures
-├── data/sample_incidents.csv      # evaluation test set
+├── knowledge/runbooks/
+├── data/sample_incidents.csv       # 24-case labeled synthetic evaluation set
 ├── docs/
-│   ├── architecture.md
-│   ├── copilot-studio-implementation.md
-│   ├── demo-script.md
-│   ├── deployment.md
-│   └── web-command-center.md
 ├── tests/
 ├── .github/
-│   ├── ISSUE_TEMPLATE/incident.yml
-│   └── workflows/
-├── .streamlit/config.toml
 ├── Dockerfile
 ├── docker-compose.yml
 ├── SECURITY.md
 └── LICENSE
 ```
 
-## Microsoft Copilot Studio enterprise version
+## Microsoft Copilot Studio enterprise mapping
 
-See **[docs/copilot-studio-implementation.md](docs/copilot-studio-implementation.md)** for the direct mapping to:
+[`docs/copilot-studio-implementation.md`](docs/copilot-studio-implementation.md) maps the public implementation to:
 
 - agent instructions and generative orchestration
-- knowledge grounding
-- tools / connectors / agent flows
+- grounded knowledge
+- tools, connectors, and agent flows
 - autonomous event triggers
-- Power Automate-style approvals
-- incident updates and Teams/Outlook communications
-- testing, evaluation and monitoring
+- approval workflows
+- Teams/Outlook-style communications
+- evaluation and monitoring
 
-The public Python/GitHub implementation makes the architecture inspectable by recruiters; the Microsoft blueprint shows how the same pattern moves into an enterprise agent stack.
+The public Python/GitHub implementation makes the architecture inspectable; the Microsoft blueprint shows how the same governance pattern can move into an enterprise agent platform.
 
-## CV-ready project line
+## CV-ready line — TPM / PMO / Digital Transformation
 
-> **AutonomousOps — Agentic AI Incident Response:** Built an event-driven multi-agent incident-response system orchestrating severity triage, runbook grounding, optional generative root-cause reasoning, governed tool execution, human approval gates, stakeholder communication and auditable AgentOps evaluation using Python, Next.js, React Three Fiber, Streamlit, FastAPI and GitHub Actions, with a Microsoft Copilot Studio enterprise implementation blueprint.
+> **AutonomousOps — AI Incident Governance & Service Recovery:** Designed and built an event-driven incident-response control plane combining deterministic severity/SLA policy, grounded vector runbook retrieval, human approval gates, simulated allowlisted remediation, stakeholder communications, and end-to-end audit traces; validated across 24 synthetic scenarios at 100% severity/runbook/approval-gate accuracy with automated Python, Next.js, GitHub Actions, API, and Docker checks.
 
-## Safety
+## Scope and safety
 
-Read [SECURITY.md](SECURITY.md). Do not attach this portfolio project to real production systems without organization-specific security, identity, DLP, approval, change-management and operational controls.
+This repository is a **new portfolio project built with synthetic data**. It demonstrates architecture, governance, evaluation, and implementation quality; it does not claim real production usage, outage reduction, cost savings, or customer impact.
+
+Read [SECURITY.md](SECURITY.md). Do not connect this portfolio implementation to real production systems without organization-specific identity, secrets management, DLP, change-management, approval, observability, and operational controls.
