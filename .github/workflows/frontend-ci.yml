@@ -1,0 +1,66 @@
+name: Command Center CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Agent contract tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Boot and smoke test web/API
+        shell: bash
+        run: |
+          npm start -- -p 3000 > /tmp/autonomousops-web.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:3000/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/ > /tmp/home.html
+          curl -fsS -X POST http://127.0.0.1:3000/api/incidents \
+            -H 'Content-Type: application/json' \
+            -d '{"incident_id":"CI-1","title":"Checkout API timeouts","description":"Production checkout requests are timing out for multiple users after a deployment","service":"checkout-api","environment":"production","customer_impact":"Multiple customers cannot complete checkout","recent_change":true}' > /tmp/waiting.json
+          curl -fsS -X POST 'http://127.0.0.1:3000/api/incidents?approved=true' \
+            -H 'Content-Type: application/json' \
+            -d '{"incident_id":"CI-1","title":"Checkout API timeouts","description":"Production checkout requests are timing out for multiple users after a deployment","service":"checkout-api","environment":"production","customer_impact":"Multiple customers cannot complete checkout","recent_change":true}' > /tmp/approved.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'))
+          const waiting = JSON.parse(fs.readFileSync('/tmp/waiting.json', 'utf8'))
+          const approved = JSON.parse(fs.readFileSync('/tmp/approved.json', 'utf8'))
+          if (health.status !== 'ok' || health.paid_api_required !== false) throw new Error('health contract failed')
+          if (waiting.severity !== 'P1' || waiting.status !== 'WAITING_FOR_APPROVAL') throw new Error('waiting path failed')
+          if (approved.status !== 'ACTION_EXECUTED') throw new Error('approval resume failed')
+          if (!fs.readFileSync('/tmp/home.html', 'utf8').includes('AutonomousOps')) throw new Error('home page did not render')
+          console.log('web, health, waiting and approval smoke tests passed')
+          NODE
