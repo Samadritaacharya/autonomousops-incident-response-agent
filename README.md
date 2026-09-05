@@ -10,7 +10,7 @@
 
 > **Control boundary at a glance:** severity, SLA, approval requirements, tool authorization, and remediation permission are deterministic. The optional LLM can enrich root-cause hypotheses only; it cannot approve or authorize a mutating action.
 
-## Recruiter snapshot
+## Verification snapshot
 
 | Proof point | Verified result |
 |---|---:|
@@ -120,7 +120,7 @@ flowchart TD
 | 3D / motion layer | React Three Fiber + ShaderGradient + Motion |
 | Zero-key hosted demo backend | Next.js route handlers + deterministic TypeScript contract |
 | Event-driven trigger | GitHub Issues → GitHub Actions |
-| Python recruiter UI | Streamlit |
+| Python demo UI | Streamlit |
 | Machine-to-machine API | FastAPI |
 | Triage | Severity + SLA classification with negation-aware signal handling |
 | Runbook grounding | Local TF-IDF cosine vector retrieval + deterministic service affinity |
@@ -265,7 +265,7 @@ No separate `incident` label is required.
 │   ├── tests/                      # web governance and parity tests
 │   ├── DESIGN.md
 │   └── README.md
-├── app.py                          # Streamlit recruiter experience
+├── app.py                          # Streamlit demo experience
 ├── api.py                          # FastAPI endpoint
 ├── src/
 │   ├── agents.py                   # triage, vector retrieval, reasoning, risk, resolution
@@ -304,10 +304,6 @@ No separate `incident` label is required.
 - evaluation and monitoring
 
 The public Python/GitHub implementation makes the architecture inspectable; the Microsoft blueprint shows how the same governance pattern can move into an enterprise agent platform.
-
-## CV-ready line — TPM / PMO / Digital Transformation
-
-> **AutonomousOps — AI Incident Governance & Service Recovery:** Designed and built an event-driven incident-response control plane combining deterministic severity/SLA policy, grounded vector runbook retrieval, human approval gates, simulated allowlisted remediation, stakeholder communications, and end-to-end audit traces; validated across 24 synthetic scenarios at 100% severity/runbook/approval-gate accuracy with automated Python, Next.js, GitHub Actions, API, and Docker checks.
 
 ## Scope and safety
 
