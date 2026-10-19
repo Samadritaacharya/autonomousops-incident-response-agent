@@ -1,0 +1,84 @@
+name: Portfolio runtime verification
+on:
+  push:
+    branches: [audit/portfolio-verification-20261019]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          if [ -f pyproject.toml ]; then python -m pip install -e '.[dev]'; fi
+          if [ -f aiops-incident-detection-public-ready/backend/requirements.txt ]; then python -m pip install -r aiops-incident-detection-public-ready/backend/requirements.txt; fi
+          python -m pip install pytest
+      - name: Run backend unit tests and example scenario evaluations
+        run: |
+          python -m compileall -q .
+          if [ -d tests ]; then python -m pytest -q tests; fi
+          if [ -f scripts/evaluate.py ]; then python scripts/evaluate.py; fi
+          if [ -f scripts/simulate_incident.py ]; then python scripts/simulate_incident.py; fi
+          if [ -f scripts/export_demo_service.py ]; then python -m scripts.export_demo_service --output /tmp/platformpulse-demo-generated; fi
+          if [ -f aiops-incident-detection-public-ready/backend/tests/test_api.py ]; then python -m pytest -q aiops-incident-detection-public-ready/backend/tests; fi
+          if [ -f scripts/generate_profile_card.py ]; then python scripts/generate_profile_card.py; fi
+      - name: Validate supplied example data and generated SVG assets
+        run: |
+          python - <<'PY'
+          import csv,json,pathlib,xml.etree.ElementTree as ET
+          count=0
+          for folder in ('data','sample_data','evaluation'):
+              root=pathlib.Path(folder)
+              if not root.is_dir():continue
+              for p in root.rglob('*'):
+                  if not p.is_file():continue
+                  if p.suffix.lower()=='.csv':
+                      with p.open(encoding='utf-8-sig',newline='') as f:
+                          reader=csv.DictReader(f)
+                          rows=list(reader)
+                          assert reader.fieldnames and rows, f'No example rows: {p}'
+                          print(f'{p}: {len(rows)} records')
+                          count+=1
+                  elif p.suffix.lower()=='.json':
+                      data=json.loads(p.read_text(encoding='utf-8'))
+                      assert data is not None
+                      print(f'{p}: valid JSON')
+                      count+=1
+                  elif p.suffix.lower()=='.txt':
+                      assert p.read_text(encoding='utf-8').strip(), f'Empty example transcript: {p}'
+                      print(f'{p}: nonempty sample text')
+                      count+=1
+          for svg in ('dark_mode.svg','light_mode.svg'):
+              if pathlib.Path(svg).exists():ET.parse(svg);print(f'{svg}: valid SVG')
+          print(f'Validated {count} sample datasets/files; business logic is separately tested above.')
+          PY
+      - name: Install and test JavaScript and UI projects
+        run: |
+          if [ -f package.json ]; then
+            npm install --no-audit --no-fund
+            npm run check --if-present
+            npm run test --if-present
+            npm run test:web --if-present
+            npm run build --if-present
+            npm run typecheck --if-present
+          elif [ -f frontend/package.json ]; then
+            cd frontend
+            npm install --no-audit --no-fund
+            npm run test --if-present
+            npm run test:web --if-present
+            npm run build --if-present
+            npm run typecheck --if-present
+          else
+            echo 'No JavaScript package manifest; Python or profile verification applies.'
+          fi
